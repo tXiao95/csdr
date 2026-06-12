@@ -2,7 +2,7 @@
 % Please edit documentation in R/estimate_residualized_pair.R
 \name{train_nuisance_models}
 \alias{train_nuisance_models}
-\title{Train all Nuisance Models E\link{Y|C} and E\link{X_i|C}}
+\title{Train all Nuisance Models E(Y | C) and E(X_i | C)}
 \usage{
 train_nuisance_models(Y, X, C, fitter, ...)
 }
@@ -21,5 +21,5 @@ train_nuisance_models(Y, X, C, fitter, ...)
 A list containing $Y_model and $X_models.
 }
 \description{
-Train all Nuisance Models E\link{Y|C} and E\link{X_i|C}
+Train all Nuisance Models E(Y | C) and E(X_i | C)
 }

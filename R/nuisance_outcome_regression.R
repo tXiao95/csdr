@@ -1,9 +1,10 @@
-#' Fit a Global Outcome Regression Object E[Y | X, C]
+#' Fit a Global Outcome Regression Object E(Y | X, C)
 #'
 #' @param Y Numeric vector of outcomes.
 #' @param X Numeric matrix or data frame of observed treatments.
 #' @param C Numeric matrix or data frame of observed confounders.
 #' @param mu_fitter Function(Y, XC_df) that trains and returns a model.
+#' @param ... Additional arguments passed to the inner fitter.
 #' @return An S3 object of class "outcome_model".
 
 outcome_model <- function(Y, X, C, mu_fitter, ...) {
@@ -53,6 +54,10 @@ outcome_model <- function(Y, X, C, mu_fitter, ...) {
 }
 
 #' Predict Method for Outcome Model
+#'
+#' @param object An object of class "outcome_model".
+#' @param newdata A data frame containing the predictors.
+#' @param ... Additional arguments passed to the inner predict method.
 predict.outcome_model <- function(object, newdata, ...) {
 
   # Ensure newdata is a data frame
@@ -74,7 +79,7 @@ predict.outcome_model <- function(object, newdata, ...) {
   newdata <- newdata[, req_cols, drop = FALSE]
 
   # Predict using the inner model
-  preds <- predict(object$inner_fit, newdata = newdata, ...)
+  preds <- stats::predict(object$inner_fit, newdata = newdata, ...)
 
   # Extract numeric vector (SuperLearner returns a list with a $pred matrix)
   if (is.list(preds) && "pred" %in% names(preds)) {
@@ -86,5 +91,5 @@ predict.outcome_model <- function(object, newdata, ...) {
 
 # Define the wrapper
 SL_outcome_fitter <- function(Y, XC_df, SL.lib = c("SL.glm", "SL.glmnet", "SL.xgboost", "SL.earth"), ...) {
-  SuperLearner::SuperLearner(Y = Y, X = XC_df, family = gaussian(), SL.lib = SL.lib, ...)
+  SuperLearner::SuperLearner(Y = Y, X = XC_df, family = stats::gaussian(), SL.lib = SL.lib, ...)
 }

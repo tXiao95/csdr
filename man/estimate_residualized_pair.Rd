@@ -14,8 +14,8 @@ estimate_residualized_pair(Y, X, C, C_models)
 \item{C}{Numeric matrix or data frame of observed confounders (n x q).}
 
 \item{C_models}{A list containing pre-fitted nuisance models:
-\code{C_models$Y_model} (predicts E\link{Y|C}) and
-\code{C_models$X_models} (a list of p models predicting E\link{X_i|C}).}
+\code{C_models$Y_model} (predicts E(Y | C)) and
+\code{C_models$X_models} (a list of p models predicting E(X_i | C)).}
 }
 \value{
 A list containing two objects: \code{Ytilde} (numeric vector) and \code{Xtilde} (numeric matrix).

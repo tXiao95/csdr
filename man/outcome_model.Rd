@@ -2,7 +2,7 @@
 % Please edit documentation in R/nuisance_outcome_regression.R
 \name{outcome_model}
 \alias{outcome_model}
-\title{Fit a Global Outcome Regression Object E\link{Y | X, C}}
+\title{Fit a Global Outcome Regression Object E(Y | X, C)}
 \usage{
 outcome_model(Y, X, C, mu_fitter, ...)
 }
@@ -14,10 +14,12 @@ outcome_model(Y, X, C, mu_fitter, ...)
 \item{C}{Numeric matrix or data frame of observed confounders.}
 
 \item{mu_fitter}{Function(Y, XC_df) that trains and returns a model.}
+
+\item{...}{Additional arguments passed to the inner fitter.}
 }
 \value{
 An S3 object of class "outcome_model".
 }
 \description{
-Fit a Global Outcome Regression Object E\link{Y | X, C}
+Fit a Global Outcome Regression Object E(Y | X, C)
 }

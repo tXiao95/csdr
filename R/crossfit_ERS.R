@@ -17,6 +17,8 @@
 #' @param args_gps List of additional arguments to pass to gps_fitter.
 #'
 #' @return A list containing the globally aggregated 'results' data frame and 'metadata'.
+#'
+#' @export
 
 crossfit_ERS <- function(Y, X, C, x_eval = NULL,
                          estimator = c("DR", "RA", "IPW"),
@@ -68,7 +70,7 @@ crossfit_ERS <- function(Y, X, C, x_eval = NULL,
       gps_req <- list(X = X_df[train_idx, , drop=FALSE], C = C_df[train_idx, , drop=FALSE], pi_fitter = gps_fitter)
       gps_mod <- do.call(gps_model, c(gps_req, args_gps))
 
-      pi_hat_full[test_idx] <- predict(gps_mod, newdata = cbind(X_df[test_idx, , drop=FALSE], C_df[test_idx, , drop=FALSE]))
+      pi_hat_full[test_idx] <- stats::predict(gps_mod, newdata = cbind(X_df[test_idx, , drop=FALSE], C_df[test_idx, , drop=FALSE]))
     }
 
     # --- Train Outcome Model and Predict ---
@@ -76,13 +78,13 @@ crossfit_ERS <- function(Y, X, C, x_eval = NULL,
       out_req <- list(Y = Y[train_idx], X = X_df[train_idx, , drop=FALSE], C = C_df[train_idx, , drop=FALSE], mu_fitter = outcome_fitter)
       out_mod <- do.call(outcome_model, c(out_req, args_outcome))
 
-      m_obs_full[test_idx] <- predict(out_mod, newdata = cbind(X_df[test_idx, , drop=FALSE], C_df[test_idx, , drop=FALSE]))
+      m_obs_full[test_idx] <- stats::predict(out_mod, newdata = cbind(X_df[test_idx, , drop=FALSE], C_df[test_idx, , drop=FALSE]))
 
       # Zero-Copy Target Evaluation for the test fold
       dt_grid <- data.table::as.data.table(C_df[test_idx, , drop=FALSE])
       x_names <- colnames(X_df)
       for (x_col in x_names) {
-        dt_grid[, (x_col) := 0.0]
+        data.table::set(dt_grid, j = x_col, value = 0.0)
       }
       data.table::setcolorder(dt_grid, c(x_names, colnames(C_df)))
 
@@ -91,7 +93,7 @@ crossfit_ERS <- function(Y, X, C, x_eval = NULL,
         for (j_col in seq_along(x_names)) {
           data.table::set(dt_grid, j = x_names[j_col], value = x_target[j_col])
         }
-        m_target_mat[test_idx, j] <- predict(out_mod, newdata = dt_grid)
+          m_target_mat[test_idx, j] <- stats::predict(out_mod, newdata = dt_grid)
       }
     }
     # Clearing memory for nnet
@@ -110,7 +112,7 @@ crossfit_ERS <- function(Y, X, C, x_eval = NULL,
 
     if (is.null(h)) {
       active_c <- ifelse(optimize_bw, 3.0, c_multiplier)
-      h_pilot <- active_c * apply(X_df, 2, sd) * (n^(-0.2)) # Correctly scales by global N
+      h_pilot <- active_c * apply(X_df, 2, stats::sd) * (n^(-0.2)) # Correctly scales by global N
     } else {
       h_pilot <- h
     }
@@ -134,7 +136,7 @@ crossfit_ERS <- function(Y, X, C, x_eval = NULL,
 
     else if (estimator == "IPW") {
       K_weights <- rep(1, n)
-      for (dim_idx in 1:p) K_weights <- K_weights * dnorm((X_df[, dim_idx] - x_target[dim_idx]) / h_pilot[dim_idx])
+        for (dim_idx in 1:p) K_weights <- K_weights * stats::dnorm((X_df[, dim_idx] - x_target[dim_idx]) / h_pilot[dim_idx])
       den <- sum(K_weights * inv_pi)
       h_out[] <- h_pilot
 
@@ -148,13 +150,13 @@ crossfit_ERS <- function(Y, X, C, x_eval = NULL,
       m_hat_j <- m_target_mat[, j]
 
       compute_dr <- function(h_vec) {
-        K_weights <- rep(1, n)
-        for (dim_idx in 1:p) K_weights <- K_weights * dnorm((X_df[, dim_idx] - x_target[dim_idx]) / h_vec[dim_idx])
-        den <- sum(K_weights * inv_pi)
+          K_weights <- rep(1, n)
+          for (dim_idx in 1:p) K_weights <- K_weights * stats::dnorm((X_df[, dim_idx] - x_target[dim_idx]) / h_vec[dim_idx])
+          den <- sum(K_weights * inv_pi)
 
         if (den < 1e-12) {
           psi_i <- m_hat_j - ra_est
-          return(list(est = ra_est, se = sd(psi_i)/sqrt(n), var_psi = var(psi_i)))
+          return(list(est = ra_est, se = stats::sd(psi_i)/sqrt(n), var_psi = stats::var(psi_i)))
         }
 
         w_i <- n * (K_weights * inv_pi) / den
@@ -163,7 +165,7 @@ crossfit_ERS <- function(Y, X, C, x_eval = NULL,
 
         # The true DML influence function utilizing the full N cross-fitted residuals
         psi_i <- w_i * (Y - m_obs_full) + (m_hat_j - est)
-        return(list(est = est, se = sd(psi_i)/sqrt(n), var_psi = var(psi_i)))
+        return(list(est = est, se = stats::sd(psi_i)/sqrt(n), var_psi = stats::var(psi_i)))
       }
 
       if (optimize_bw) {

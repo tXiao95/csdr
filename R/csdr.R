@@ -14,6 +14,8 @@
 #' @return A list containing the MAVE fit, dimension estimation object, selected dimension,
 #'         the generated pseudo-data, and run metadata. If multiple methods are requested,
 #'         returns a named list of such objects.
+#'
+#' @export
 
 csdr <- function(Y, X, C,
                    method = c("DR"), # Defaulting to DR, but allowing multiple

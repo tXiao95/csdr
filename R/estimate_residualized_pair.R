@@ -4,8 +4,8 @@
 #' @param X Numeric matrix or data frame of observed treatments (n x p).
 #' @param C Numeric matrix or data frame of observed confounders (n x q).
 #' @param C_models A list containing pre-fitted nuisance models:
-#'        \code{C_models$Y_model} (predicts E[Y|C]) and
-#'        \code{C_models$X_models} (a list of p models predicting E[X_i|C]).
+#'        \code{C_models$Y_model} (predicts E(Y | C)) and
+#'        \code{C_models$X_models} (a list of p models predicting E(X_i | C)).
 #' @return A list containing two objects: \code{Ytilde} (numeric vector) and \code{Xtilde} (numeric matrix).
 
 estimate_residualized_pair <- function(Y, X, C, C_models) {
@@ -33,19 +33,19 @@ estimate_residualized_pair <- function(Y, X, C, C_models) {
   }
 
   # ---------------------------------------------------------
-  # 1. Predict E(Y|C) and compute \tilde{Y}
+  # 1. Predict E(Y | C) and compute \tilde{Y}
   # ---------------------------------------------------------
-  E_Y_C <- predict(C_models$Y_model, newdata = C_df)
+  E_Y_C <- stats::predict(C_models$Y_model, newdata = C_df)
   Ytilde <- Y - E_Y_C
 
   # ---------------------------------------------------------
-  # 2. Predict E(X_i|C) and compute \tilde{X} for i = 1,...,p
+  # 2. Predict E(X_i | C) and compute \tilde{X} for i = 1,...,p
   # ---------------------------------------------------------
   Xtilde <- matrix(NA, nrow = n, ncol = p)
   colnames(Xtilde) <- colnames(X_df)
 
   for (i in 1:p) {
-    E_X_i_C <- predict(C_models$X_models[[i]], newdata = C_df)
+    E_X_i_C <- stats::predict(C_models$X_models[[i]], newdata = C_df)
     Xtilde[, i] <- X_df[, i] - E_X_i_C
   }
 
@@ -58,7 +58,7 @@ estimate_residualized_pair <- function(Y, X, C, C_models) {
   ))
 }
 
-#' Train all Nuisance Models E[Y|C] and E[X_i|C]
+#' Train all Nuisance Models E(Y | C) and E(X_i | C)
 #'
 #' @param Y Numeric vector of outcomes.
 #' @param X Numeric matrix of treatments.
@@ -72,13 +72,13 @@ train_nuisance_models <- function(Y, X, C, fitter, ...) {
   C_df <- as.data.frame(C)
   p <- ncol(X_df)
 
-  # Train E[Y|C]
+  # Train E(Y | C)
   Y_model <- nuisance_C_model(target = Y, C = C_df, fitter = fitter, ...)
 
-  # Train E[X_i|C] for all p dimensions
+  # Train E(X_i | C) for all p dimensions
   X_models <- vector("list", p)
   for (i in 1:p) {
-    message("Training Model X", i, "|C")
+    message("Training Model X", i, " | C")
     X_models[[i]] <- nuisance_C_model(target = X_df[, i], C = C_df, fitter = fitter, ...)
   }
 

@@ -6,6 +6,15 @@
 \usage{
 mvn_fitter(X, C, method_gps = c("linear", "SuperLearner"), ...)
 }
+\arguments{
+\item{X}{Numeric matrix or data frame of observed treatments.}
+
+\item{C}{Numeric matrix or data frame of observed confounders.}
+
+\item{method_gps}{String in \code{c("linear","SuperLearner")}.}
+
+\item{...}{Additional arguments passed to the density fitter.}
+}
 \description{
 Inner Fitter for MVN GPS
 }

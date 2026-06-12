@@ -6,6 +6,15 @@
 \usage{
 \method{predict}{mvn_inner}(object, newdata, delta_n = 1e-16, ...)
 }
+\arguments{
+\item{object}{An object of class "mvn_inner".}
+
+\item{newdata}{A data frame containing predictors.}
+
+\item{delta_n}{Floor for density predictions.}
+
+\item{...}{Additional arguments passed to the inner predict method.}
+}
 \description{
 Predict Method for Inner MVN
 }

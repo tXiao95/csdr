@@ -17,6 +17,8 @@
 #'
 #' @return A list containing a 'results' data frame (estimates and CIs) and 'metadata' (diagnostics),
 #'         OR a numeric vector of estimates if return_vector is TRUE or estimator is RA/IPW.
+#'
+#' @export
 
 estimate_ERS <- function(Y, X, C, x_eval = NULL,
                              estimator = c("DR", "RA", "IPW"),
@@ -89,7 +91,7 @@ estimate_ERS <- function(Y, X, C, x_eval = NULL,
     # 1. Bandwidth Setup
     if (is.null(h)) {
       active_c <- ifelse(optimize_bw, 3.0, c_multiplier)
-      h_pilot <- active_c * apply(X_df, 2, sd) * (n^(-0.2))
+      h_pilot <- active_c * apply(X_df, 2, stats::sd) * (n^(-0.2))
     } else {
       h_pilot <- h
     }
@@ -97,7 +99,7 @@ estimate_ERS <- function(Y, X, C, x_eval = NULL,
 
     # 2. Predict Propensity Score
     df_observed <- cbind(X_df, C_df)
-    pi_hat <- predict(gps_model, newdata = df_observed)
+    pi_hat <- stats::predict(gps_model, newdata = df_observed)
     pi_hat <- pmax(pi_hat, delta_n)
 
     # 3. Cache inverse values for speed
@@ -113,16 +115,16 @@ estimate_ERS <- function(Y, X, C, x_eval = NULL,
   if (estimator %in% c("RA", "DR")) {
 
     # 1. Base the grid entirely on C
-    dt_grid <- as.data.table(C_df)
+    dt_grid <- data.table::as.data.table(C_df)
 
     # 2. Pre-allocate the X columns with dummy values
     x_names <- colnames(X_df)
     for (x_col in x_names) {
-      dt_grid[, (x_col) := 0.0]
+      data.table::set(dt_grid, j = x_col, value = 0.0)
     }
 
     # 3. Force the exact column order the models expect
-    setcolorder(dt_grid, c(x_names, colnames(C_df)))
+    data.table::setcolorder(dt_grid, c(x_names, colnames(C_df)))
   }
 
   # ---------------------------------------------------------
@@ -145,7 +147,7 @@ estimate_ERS <- function(Y, X, C, x_eval = NULL,
         data.table::set(dt_grid, j = x_names[j_col], value = x_target[j_col])
       }
 
-      m_hat <- predict(out_model, newdata = dt_grid)
+      m_hat <- stats::predict(out_model, newdata = dt_grid)
       ra_est <- mean(m_hat)
     }
 
@@ -165,7 +167,7 @@ estimate_ERS <- function(Y, X, C, x_eval = NULL,
     else if (estimator == "IPW") {
       K_weights <- rep(1, n)
       for (j in 1:p) {
-        K_weights <- K_weights * dnorm((X_df[, j] - x_target[j]) / h_pilot[j])
+        K_weights <- K_weights * stats::dnorm((X_df[, j] - x_target[j]) / h_pilot[j])
       }
       den <- sum(K_weights * inv_pi)
 
@@ -186,13 +188,13 @@ estimate_ERS <- function(Y, X, C, x_eval = NULL,
       # Abstracted DR math to easily run multiple bandwidth passes
       compute_dr <- function(h_vec) {
         K_weights <- rep(1, n)
-        for (j in 1:p) K_weights <- K_weights * dnorm((X_df[, j] - x_target[j]) / h_vec[j])
+        for (j in 1:p) K_weights <- K_weights * stats::dnorm((X_df[, j] - x_target[j]) / h_vec[j])
         den <- sum(K_weights * inv_pi)
 
         # Safety fallback if evaluated target is entirely outside observed support
         if (den < 1e-12) {
           psi_i <- m_hat - ra_est
-          return(list(est = ra_est, se = sd(psi_i)/sqrt(n), var_psi = var(psi_i)))
+          return(list(est = ra_est, se = stats::sd(psi_i)/sqrt(n), var_psi = stats::var(psi_i)))
         }
 
         w_i <- n * (K_weights * inv_pi) / den
@@ -201,7 +203,7 @@ estimate_ERS <- function(Y, X, C, x_eval = NULL,
 
         # Centered IF as derived from Zhang & Chen (2025)
         psi_i <- w_i * (Y - m_hat) + (m_hat - est)
-        return(list(est = est, se = sd(psi_i)/sqrt(n), var_psi = var(psi_i)))
+        return(list(est = est, se = stats::sd(psi_i)/sqrt(n), var_psi = stats::var(psi_i)))
       }
 
       if (optimize_bw) {

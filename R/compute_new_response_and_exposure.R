@@ -55,8 +55,11 @@ compute_new_response_and_exposure <- function(Y, X, C,
   # ---------------------------------------------------------
   # 2. Pre-allocate Output Structures for ALL requested methods
   # ---------------------------------------------------------
-  new_Y_list <- setNames(lapply(method, function(m) rep(NA_real_, n)), method)
-  new_X_list <- setNames(lapply(method, function(m) X_mat), method)
+  new_Y_list <- lapply(method, function(m) rep(NA_real_, n))
+  names(new_Y_list) <- method
+
+  new_X_list <- lapply(method, function(m) X_mat)
+  names(new_X_list) <- method
   
   set.seed(seed)
   folds <- sample(rep(1:L, length.out = n))

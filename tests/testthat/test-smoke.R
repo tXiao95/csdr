@@ -65,3 +65,92 @@ test_that("outcome_model and predict output match expectation", {
   expect_true(all(is.finite(pred)))
   expect_false(anyNA(pred))
 })
+
+test_that("csdr main public API is deterministic for RA and returns expected structure", {
+  d <- sample_data(seed = 3030)
+  set.seed(3030)
+
+  csdr_out1 <- suppressWarnings(
+    csdr(
+    Y = d$Y,
+    X = d$X,
+    C = d$C,
+    method = "RA",
+    args_compute_new_response = list(
+      L = 2L,
+      outcome_fitter = fit_linear,
+      seed = 3030
+    )
+    )
+  )
+
+  set.seed(3030)
+  csdr_out2 <- suppressWarnings(
+    csdr(
+    Y = d$Y,
+    X = d$X,
+    C = d$C,
+    method = "RA",
+    args_compute_new_response = list(
+      L = 2L,
+      outcome_fitter = fit_linear,
+      seed = 3030
+    )
+    )
+  )
+
+  expect_type(csdr_out1, "list")
+  expect_equal(names(csdr_out1), c("mave_fit", "mave_dim_obj", "d_hat", "new_data", "metadata"))
+  expect_equal(csdr_out1$metadata$causal_method, "RA")
+  expect_equal(csdr_out1$metadata$n_observations, nrow(d$X))
+  expect_true(is.matrix(csdr_out1$new_data$new_X))
+  expect_equal(nrow(csdr_out1$new_data$new_X), nrow(d$X))
+  expect_true(csdr_out1$metadata$cre_pipeline$L_folds == 2L)
+  expect_equal(
+    csdr_out1$metadata$cre_pipeline$seed,
+    3030L
+  )
+  expect_equal(csdr_out1$d_hat, csdr_out2$d_hat)
+  expect_equal(csdr_out1$new_data$new_Y, csdr_out2$new_data$new_Y)
+})
+
+test_that("estimate_ERS RA returns finite numeric vector and is reproducible", {
+  d <- sample_data(seed = 4040)
+  x_eval <- d$X[1:4, , drop = FALSE]
+
+  out_model <- outcome_model(
+    Y = d$Y,
+    X = d$X,
+    C = d$C,
+    mu_fitter = fit_linear
+  )
+
+  est1 <- suppressWarnings(
+    estimate_ERS(
+    Y = d$Y,
+    X = d$X,
+    C = d$C,
+    estimator = "RA",
+    x_eval = x_eval,
+    return_vector = TRUE,
+    out_model = out_model
+    )
+  )
+
+  est2 <- suppressWarnings(
+    estimate_ERS(
+    Y = d$Y,
+    X = d$X,
+    C = d$C,
+    estimator = "RA",
+    x_eval = x_eval,
+    return_vector = TRUE,
+    out_model = out_model
+    )
+  )
+
+  expect_type(est1, "double")
+  expect_equal(length(est1), nrow(x_eval))
+  expect_true(all(is.finite(est1)))
+  expect_equal(est1, est2)
+})

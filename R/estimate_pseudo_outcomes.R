@@ -28,8 +28,8 @@ estimate_pseudo_outcomes <- function(Y, X, C, out_model, gps_model, delta_n = 1e
   # ---------------------------------------------------------
   df_observed <- cbind(X_df, C_df)
 
-  m_obs  <- predict(out_model, newdata = df_observed)
-  pi_obs <- predict(gps_model, newdata = df_observed)
+  m_obs  <- stats::predict(out_model, newdata = df_observed)
+  pi_obs <- stats::predict(gps_model, newdata = df_observed)
   pi_obs <- pmax(pi_obs, delta_n)
 
   # ---------------------------------------------------------
@@ -37,16 +37,16 @@ estimate_pseudo_outcomes <- function(Y, X, C, out_model, gps_model, delta_n = 1e
   # ---------------------------------------------------------
 
   # 1. Base the grid entirely on C (which never changes for the marginalization)
-  dt_grid <- as.data.table(C_df)
+  dt_grid <- data.table::as.data.table(C_df)
 
   # 2. Pre-allocate the X columns with dummy values (0.0)
   x_names <- colnames(X_df)
   for (x_col in x_names) {
-    dt_grid[, (x_col) := 0.0]
+    data.table::set(dt_grid, j = x_col, value = 0.0)
   }
 
   # 3. Force the exact column order the models expect
-  setcolorder(dt_grid, c(x_names, colnames(C_df)))
+  data.table::setcolorder(dt_grid, c(x_names, colnames(C_df)))
 
   # ---------------------------------------------------------
   # Main Loop over Individuals (Hyper-Optimized)
@@ -62,8 +62,8 @@ estimate_pseudo_outcomes <- function(Y, X, C, out_model, gps_model, delta_n = 1e
     }
 
     # Predict
-    m_grid  <- predict(out_model, newdata = dt_grid)
-    pi_grid <- predict(gps_model, newdata = dt_grid)
+    m_grid  <- stats::predict(out_model, newdata = dt_grid)
+    pi_grid <- stats::predict(gps_model, newdata = dt_grid)
 
     # Calculate the empirical expectations
     mean_pi <- mean(pi_grid)
