@@ -10,5 +10,10 @@ Implements methods for causal sufficient dimension reduction with multiple conti
 \author{
 \strong{Maintainer}: Thomas Hsiao \email{thomas.hsiao@emory.edu} (\href{https://orcid.org/0009-0005-7848-7992}{ORCID})
 
+Authors:
+\itemize{
+  \item Thomas Hsiao \email{thomas.hsiao@emory.edu} (\href{https://orcid.org/0009-0005-7848-7992}{ORCID})
+}
+
 }
 \keyword{internal}

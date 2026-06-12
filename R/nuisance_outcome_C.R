@@ -39,8 +39,10 @@ nuisance_C_model <- function(target, C, fitter, ...) {
 #' @param object An object of class "nuisance_C_model".
 #' @param newdata A data frame containing the confounders (C).
 #' @param ... Additional arguments passed to the underlying predict method.
-#' 
+#'
 #' @return A numeric vector of predictions.
+#'
+#' @exportS3Method stats::predict
 
 predict.nuisance_C_model <- function(object, newdata, ...) {
 

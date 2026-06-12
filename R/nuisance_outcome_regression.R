@@ -58,6 +58,8 @@ outcome_model <- function(Y, X, C, mu_fitter, ...) {
 #' @param object An object of class "outcome_model".
 #' @param newdata A data frame containing the predictors.
 #' @param ... Additional arguments passed to the inner predict method.
+#'
+#' @exportS3Method stats::predict
 predict.outcome_model <- function(object, newdata, ...) {
 
   # Ensure newdata is a data frame
