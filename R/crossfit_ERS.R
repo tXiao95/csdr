@@ -160,11 +160,11 @@ crossfit_ERS <- function(Y, X, C, x_eval = NULL,
         }
 
         w_i <- n * (K_weights * inv_pi) / den
-        delta_est <- sum(w_i * (Y - m_obs_full)) / n
+        delta_est <- sum(w_i * (Y - m_hat_j)) / n
         est <- ra_est + delta_est
 
-        # The true DML influence function utilizing the full N cross-fitted residuals
-        psi_i <- w_i * (Y - m_obs_full) + (m_hat_j - est)
+        # Residuals are evaluated at the target exposure value for this ERS row.
+        psi_i <- w_i * (Y - m_hat_j) + (m_hat_j - est)
         return(list(est = est, se = stats::sd(psi_i)/sqrt(n), var_psi = stats::var(psi_i)))
       }
 
