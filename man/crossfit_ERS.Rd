@@ -2,7 +2,7 @@
 % Please edit documentation in R/crossfit_ERS.R
 \name{crossfit_ERS}
 \alias{crossfit_ERS}
-\title{Estimate Cross-Fitted Causal Exposure Response Surface (Colangelo and Lee, 2026)}
+\title{Estimate a cross-fitted causal exposure-response surface}
 \usage{
 crossfit_ERS(
   Y,
@@ -23,39 +23,42 @@ crossfit_ERS(
 )
 }
 \arguments{
-\item{Y}{Numeric vector of observed outcomes (length n).}
+\item{Y}{Numeric vector of observed outcomes.}
 
-\item{X}{Numeric matrix or data frame of observed treatments (n x p).}
+\item{X}{Numeric matrix or data frame of observed exposures/treatments.}
 
-\item{C}{Numeric matrix or data frame of observed confounders (n x q).}
+\item{C}{Numeric matrix or data frame of observed covariates.}
 
-\item{x_eval}{Matrix or data frame of target treatment values to evaluate (m x p).}
+\item{x_eval}{Optional matrix or data frame of exposure values where the
+exposure-response surface should be evaluated.}
 
-\item{estimator}{String indicating the estimator to use: "DR", "RA", or "IPW". Defaults to "DR".}
+\item{estimator}{Estimator to use: \code{"DR"}, \code{"RA"}, or \code{"IPW"}.}
 
-\item{L}{Integer indicating the number of folds for cross-fitting. Defaults to 5.}
+\item{L}{Number of folds for cross-fitting. \code{L = 1} disables cross-fitting.}
 
-\item{outcome_fitter}{Function to train outcome models. Required for RA and DR.}
+\item{outcome_fitter}{Function used to fit the outcome nuisance.}
 
-\item{gps_fitter}{Function to train GPS models. Required for IPW and DR.}
+\item{gps_fitter}{Function used to fit the generalized propensity score.}
 
-\item{seed}{Random seed for cross-fitting folds.}
+\item{seed}{Optional random seed for fold construction.}
 
-\item{h}{Optional numeric vector of bandwidths (length p). Defaults to rule-of-thumb.}
+\item{h}{Optional bandwidth vector.}
 
-\item{c_multiplier}{Numeric scalar for rule-of-thumb bandwidth calculation. Defaults to 1.25.}
+\item{c_multiplier}{Multiplier used for the default bandwidth.}
 
-\item{delta_n}{Small positive threshold to floor propensity scores. Defaults to 1e-16.}
+\item{delta_n}{Positive floor applied to GPS estimates.}
 
-\item{optimize_bw}{Logical. If TRUE and estimator is "DR", dynamically calculates the AMSE-optimal bandwidth.}
+\item{optimize_bw}{Deprecated; bandwidth optimization is not implemented in
+this wrapper.}
 
-\item{args_outcome}{List of additional arguments to pass to outcome_fitter.}
+\item{args_outcome}{Additional arguments passed to \code{outcome_fitter}.}
 
-\item{args_gps}{List of additional arguments to pass to gps_fitter.}
+\item{args_gps}{Additional arguments passed to \code{gps_fitter}.}
 }
 \value{
-A list containing the globally aggregated 'results' data frame and 'metadata'.
+An object of class \code{"ers_fit"} with a legacy \code{metadata} element.
 }
 \description{
-Estimate Cross-Fitted Causal Exposure Response Surface (Colangelo and Lee, 2026)
+\code{crossfit_ERS()} is retained as a compatibility wrapper around
+\code{\link[=estimate_ers]{estimate_ers()}}. New code should call \code{\link[=estimate_ers]{estimate_ers()}} directly.
 }
