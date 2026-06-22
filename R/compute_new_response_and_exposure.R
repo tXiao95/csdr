@@ -51,6 +51,12 @@ compute_new_response_and_exposure <- function(Y, X, C,
     stop("A valid 'gps_fitter' must be provided for DR or PO.")
   }
   if( L == 1) warning("L=1 disables cross-fitting.")
+  po_gps_floor <- 1e-8
+  if (!is.null(args_ers$gps_floor)) {
+    po_gps_floor <- args_ers$gps_floor
+  } else if (!is.null(args_ers$delta_n)) {
+    po_gps_floor <- args_ers$delta_n
+  }
   
   # ---------------------------------------------------------
   # 2. Pre-allocate Output Structures for ALL requested methods
@@ -84,8 +90,16 @@ compute_new_response_and_exposure <- function(Y, X, C,
       gps_mod <- do.call(gps_model, c(gps_req_args, args_gps))
     }
     if ("RP" %in% method) {
-      c_req_args <- list(Y = Y_train, X = X_train, C = C_train, fitter = C_fitter)
-      C_mods <- do.call(train_nuisance_models, c(c_req_args, args_C))
+      C_mods <- fit_rp_nuisance(
+        Y = Y_train,
+        A = X_train,
+        C = C_train,
+        y_fitter = C_fitter,
+        a_fitter = C_fitter,
+        args_y = args_C,
+        args_a = args_C,
+        verbose = FALSE
+      )
     }
     
     # --- Step B: Generate Pseudo-Data for each requested method ---
@@ -96,12 +110,40 @@ compute_new_response_and_exposure <- function(Y, X, C,
       new_Y_list[["DR"]][test_idx] <- do.call(estimate_ERS, c(list(Y=Y_test, X=X_test, C=C_test, estimator="DR", out_model=out_mod, gps_model=gps_mod, return_vector=TRUE), args_ers))
     }
     if ("PO" %in% method) {
-      new_Y_list[["PO"]][test_idx] <- estimate_pseudo_outcomes(Y=Y_test, X=X_test, C=C_test, out_model=out_mod, gps_model=gps_mod)
+      po_nuisance <- list(
+        outcome_model = out_mod,
+        gps_model = gps_mod,
+        A_names = out_mod$X_names,
+        C_names = out_mod$C_names
+      )
+      class(po_nuisance) <- "po_nuisance"
+      po_pred <- predict_po_nuisance(
+        nuisance = po_nuisance,
+        A = X_test,
+        C = C_test,
+        C_marginal = C_test,
+        gps_floor = po_gps_floor,
+        verbose = FALSE
+      )
+      new_Y_list[["PO"]][test_idx] <- compute_pseudo_outcomes(
+        Y = Y_test,
+        m_obs = po_pred$m_obs,
+        pi_obs = po_pred$pi_obs,
+        m_marginal = po_pred$m_marginal,
+        pi_marginal = po_pred$pi_marginal,
+        gps_floor = po_gps_floor
+      )
     }
     if ("RP" %in% method) {
-      res_rp <- estimate_residualized_pair(Y=Y_test, X=X_test, C=C_test, C_models=C_mods)
-      new_Y_list[["RP"]][test_idx] <- res_rp$Ytilde
-      new_X_list[["RP"]][test_idx, ] <- res_rp$Xtilde
+      rp_pred <- predict_rp_nuisance(nuisance = C_mods, C = C_test)
+      res_rp <- compute_residualized_pair(
+        Y = Y_test,
+        A = X_test,
+        EY_C = rp_pred$EY_C,
+        EA_C = rp_pred$EA_C
+      )
+      new_Y_list[["RP"]][test_idx] <- res_rp$Y_tilde
+      new_X_list[["RP"]][test_idx, ] <- res_rp$A_tilde
     }
   }
   
