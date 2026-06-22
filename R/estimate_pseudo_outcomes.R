@@ -197,6 +197,85 @@ predict_po_nuisance <- function(nuisance, A, C, C_marginal = C,
   )
 }
 
+#' Predict cross-fitted pseudo-outcome marginal nuisance quantities
+#'
+#' @param nuisance_fits A cross-fitted pseudo-outcome nuisance object.
+#' @param A_targets Numeric matrix or data frame of fixed exposure targets.
+#' @param C Numeric matrix or data frame of covariates to marginalize over.
+#' @param folds Fold assignments for the rows of `C`.
+#' @param gps_floor Positive floor applied to GPS predictions.
+#' @param chunk_size Optional chunk size for future batched prediction.
+#' @param verbose Logical; if `TRUE`, print progress messages.
+#'
+#' @return A list with `m_marginal` and `pi_marginal`.
+predict_po_crossfit_marginals <- function(nuisance_fits, A_targets, C, folds,
+                                          gps_floor = 1e-8,
+                                          chunk_size = NULL,
+                                          verbose = FALSE) {
+  fold_fits <- nuisance_fits$folds
+  if (!is.list(fold_fits) || length(fold_fits) < 1L) {
+    stop("'nuisance_fits' must contain a nonempty 'folds' list.", call. = FALSE)
+  }
+  if (!is.numeric(gps_floor) || length(gps_floor) != 1L ||
+      is.na(gps_floor) || !is.finite(gps_floor) || gps_floor <= 0) {
+    stop("'gps_floor' must be a positive finite number.", call. = FALSE)
+  }
+  if (!is.null(chunk_size) &&
+      (!is.numeric(chunk_size) || length(chunk_size) != 1L ||
+       is.na(chunk_size) || chunk_size < 1L)) {
+    stop("'chunk_size' must be NULL or a positive integer.", call. = FALSE)
+  }
+
+  C_df <- normalize_target_table(C, n = NULL, arg = "C", prefix = "C")
+  A_df <- normalize_target_table(A_targets, n = NULL, arg = "A_targets", prefix = "A")
+  if (length(folds) != nrow(C_df)) {
+    stop("'folds' must have one entry per row of 'C'.", call. = FALSE)
+  }
+  if (anyNA(folds)) {
+    stop("'folds' cannot contain missing values.", call. = FALSE)
+  }
+
+  folds_int <- as.integer(match(folds, unique(folds)))
+  if (max(folds_int) > length(fold_fits)) {
+    stop("'folds' reference more folds than supplied nuisance fits.", call. = FALSE)
+  }
+
+  n_targets <- nrow(A_df)
+  m_marginal <- pi_marginal <- rep(NA_real_, n_targets)
+  for (j in seq_len(n_targets)) {
+    if (isTRUE(verbose) && (j == 1L || j == n_targets || j %% 50L == 0L)) {
+      message(sprintf("Predicting cross-fitted pseudo-outcome marginal row %d of %d.", j, n_targets))
+    }
+
+    m_sum <- 0
+    pi_sum <- 0
+    n_sum <- 0L
+    for (k in seq_along(fold_fits)) {
+      idx <- which(folds_int == k)
+      if (length(idx) == 0L) {
+        next
+      }
+      pred <- predict_po_target_marginal(
+        nuisance = fold_fits[[k]],
+        a_target = A_df[j, , drop = FALSE],
+        C_marginal = C_df[idx, , drop = FALSE],
+        gps_floor = gps_floor
+      )
+      m_sum <- m_sum + sum(pred$m)
+      pi_sum <- pi_sum + sum(pred$pi)
+      n_sum <- n_sum + length(idx)
+    }
+
+    if (n_sum == 0L) {
+      stop("No covariate rows were available for pseudo-outcome marginalization.", call. = FALSE)
+    }
+    m_marginal[j] <- m_sum / n_sum
+    pi_marginal[j] <- pi_sum / n_sum
+  }
+
+  list(m_marginal = m_marginal, pi_marginal = pi_marginal)
+}
+
 #' Estimate pseudo-outcomes for CSDR target construction
 #'
 #' @param Y Numeric outcome vector.
@@ -208,6 +287,12 @@ predict_po_nuisance <- function(nuisance, A, C, C_marginal = C,
 #' @param gps_fitter Function used by [gps_model()].
 #' @param nuisance Optional pre-fitted pseudo-outcome nuisance object.
 #' @param C_marginal Covariate rows used for empirical marginalization.
+#' @param marginalization Marginalization mode. `"crossfit"` treats each
+#'   observed `A_j` as a fixed target and averages over all `C_i` using the
+#'   nuisance model for `fold(i)`. `"fold"` averages only over the held-out
+#'   fold for each target row, preserving the older fold-local finite-sample
+#'   behavior. `"all"` uses `C_marginal` directly with the target row's fold
+#'   nuisance model.
 #' @param gps_floor Positive floor applied to GPS predictions.
 #' @param seed Optional random seed for fold generation.
 #' @param return_nuisance Logical; if `TRUE`, return nuisance fits.
@@ -233,6 +318,7 @@ estimate_pseudo_outcomes <- function(
   gps_fitter = mvn_fitter,
   nuisance = NULL,
   C_marginal = C,
+  marginalization = c("crossfit", "fold", "all"),
   gps_floor = 1e-8,
   seed = NULL,
   return_nuisance = FALSE,
@@ -246,6 +332,7 @@ estimate_pseudo_outcomes <- function(
   chunk_size = NULL
 ) {
   call <- match.call()
+  marginalization <- match.arg(marginalization)
   legacy_return <- is.null(A) && !is.null(X) &&
     !is.null(out_model) && !is.null(gps_model)
   if (is.null(A)) {
@@ -293,19 +380,48 @@ estimate_pseudo_outcomes <- function(
   m_obs <- pi_obs <- m_marginal <- pi_marginal <- rep(NA_real_, n)
   for (k in seq_len(L_eff)) {
     test_idx <- if (L_eff == 1L) seq_len(n) else which(folds == k)
-    pred <- predict_po_nuisance(
-      nuisance = nuisance_fits$folds[[k]],
-      A = data$A[test_idx, , drop = FALSE],
-      C = data$C[test_idx, , drop = FALSE],
-      C_marginal = C_marginal_df,
+    if (marginalization == "crossfit") {
+      pred <- predict_po_observed(
+        nuisance = nuisance_fits$folds[[k]],
+        A = data$A[test_idx, , drop = FALSE],
+        C = data$C[test_idx, , drop = FALSE],
+        gps_floor = gps_floor
+      )
+      m_obs[test_idx] <- pred$m_obs
+      pi_obs[test_idx] <- pred$pi_obs
+    } else {
+      pred <- predict_po_nuisance(
+        nuisance = nuisance_fits$folds[[k]],
+        A = data$A[test_idx, , drop = FALSE],
+        C = data$C[test_idx, , drop = FALSE],
+        C_marginal = if (marginalization == "fold") {
+          data$C[test_idx, , drop = FALSE]
+        } else {
+          C_marginal_df
+        },
+        gps_floor = gps_floor,
+        chunk_size = chunk_size,
+        verbose = verbose && L_eff > 1L
+      )
+      m_obs[test_idx] <- pred$m_obs
+      pi_obs[test_idx] <- pred$pi_obs
+      m_marginal[test_idx] <- pred$m_marginal
+      pi_marginal[test_idx] <- pred$pi_marginal
+    }
+  }
+
+  if (marginalization == "crossfit") {
+    marginal_pred <- predict_po_crossfit_marginals(
+      nuisance_fits = nuisance_fits,
+      A_targets = data$A,
+      C = data$C,
+      folds = folds,
       gps_floor = gps_floor,
       chunk_size = chunk_size,
-      verbose = verbose && L_eff > 1L
+      verbose = verbose
     )
-    m_obs[test_idx] <- pred$m_obs
-    pi_obs[test_idx] <- pred$pi_obs
-    m_marginal[test_idx] <- pred$m_marginal
-    pi_marginal[test_idx] <- pred$pi_marginal
+    m_marginal <- marginal_pred$m_marginal
+    pi_marginal <- marginal_pred$pi_marginal
   }
 
   xi_hat <- compute_pseudo_outcomes(
@@ -334,6 +450,7 @@ estimate_pseudo_outcomes <- function(
       requested_L = L,
       n = n,
       p = ncol(data$A),
+      marginalization = marginalization,
       gps_summary = summary(pi_obs)
     )
   )
@@ -405,4 +522,59 @@ normalize_target_table <- function(x, n = NULL, arg, prefix) {
     stop(sprintf("'%s' must contain only non-missing numeric values.", arg), call. = FALSE)
   }
   df
+}
+
+predict_po_observed <- function(nuisance, A, C, gps_floor = 1e-8) {
+  if (is.null(nuisance$outcome_model) || is.null(nuisance$gps_model)) {
+    stop("'nuisance' must contain 'outcome_model' and 'gps_model'.", call. = FALSE)
+  }
+  if (!is.numeric(gps_floor) || length(gps_floor) != 1L ||
+      is.na(gps_floor) || !is.finite(gps_floor) || gps_floor <= 0) {
+    stop("'gps_floor' must be a positive finite number.", call. = FALSE)
+  }
+
+  C_df <- normalize_target_table(C, n = NULL, arg = "C", prefix = "C")
+  A_df <- normalize_target_table(A, n = nrow(C_df), arg = "A", prefix = "A")
+
+  obs_newdata <- make_observed_newdata(
+    model = nuisance$outcome_model,
+    A = A_df,
+    C = C_df
+  )
+  gps_newdata <- make_observed_newdata(
+    model = nuisance$gps_model,
+    A = A_df,
+    C = C_df
+  )
+
+  list(
+    m_obs = as.numeric(stats::predict(nuisance$outcome_model, newdata = obs_newdata)),
+    pi_obs = pmax(
+      as.numeric(stats::predict(nuisance$gps_model, newdata = gps_newdata)),
+      gps_floor
+    )
+  )
+}
+
+predict_po_target_marginal <- function(nuisance, a_target, C_marginal,
+                                       gps_floor = 1e-8) {
+  C_df <- normalize_target_table(C_marginal, n = NULL, arg = "C_marginal", prefix = "C")
+  A_df <- normalize_target_table(a_target, n = 1L, arg = "a_target", prefix = "A")
+  colnames(A_df) <- nuisance$outcome_model$X_names
+  colnames(C_df) <- nuisance$outcome_model$C_names
+
+  dt_grid <- data.table::as.data.table(C_df)
+  x_names <- nuisance$outcome_model$X_names
+  for (x_col in x_names) {
+    data.table::set(dt_grid, j = x_col, value = A_df[[x_col]][1L])
+  }
+  data.table::setcolorder(dt_grid, c(x_names, nuisance$outcome_model$C_names))
+
+  list(
+    m = as.numeric(stats::predict(nuisance$outcome_model, newdata = dt_grid)),
+    pi = pmax(
+      as.numeric(stats::predict(nuisance$gps_model, newdata = dt_grid)),
+      gps_floor
+    )
+  )
 }

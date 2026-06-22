@@ -103,6 +103,67 @@ test_that("estimate_pseudo_outcomes supports full-fit and cross-fit modes", {
   expect_type(fit_l1$nuisance, "list")
 })
 
+test_that("estimate_pseudo_outcomes supports pseudo-outcome marginalization modes", {
+  d <- target_sample_data(n = 36, seed = 61031)
+  folds <- rep(1:2, length.out = nrow(d$A))
+
+  fit_default <- estimate_pseudo_outcomes(
+    Y = d$Y,
+    A = d$A,
+    C = d$C,
+    L = 2,
+    folds = folds,
+    outcome_fitter = target_fit_linear,
+    gps_fitter = mvn_fitter,
+    args_gps = list(method_gps = "linear"),
+    verbose = FALSE
+  )
+  fit_crossfit <- estimate_pseudo_outcomes(
+    Y = d$Y,
+    A = d$A,
+    C = d$C,
+    L = 2,
+    folds = folds,
+    outcome_fitter = target_fit_linear,
+    gps_fitter = mvn_fitter,
+    marginalization = "crossfit",
+    args_gps = list(method_gps = "linear"),
+    verbose = FALSE
+  )
+  fit_fold <- estimate_pseudo_outcomes(
+    Y = d$Y,
+    A = d$A,
+    C = d$C,
+    L = 2,
+    folds = folds,
+    outcome_fitter = target_fit_linear,
+    gps_fitter = mvn_fitter,
+    marginalization = "fold",
+    args_gps = list(method_gps = "linear"),
+    verbose = FALSE
+  )
+  fit_all <- estimate_pseudo_outcomes(
+    Y = d$Y,
+    A = d$A,
+    C = d$C,
+    L = 2,
+    folds = folds,
+    outcome_fitter = target_fit_linear,
+    gps_fitter = mvn_fitter,
+    marginalization = "all",
+    args_gps = list(method_gps = "linear"),
+    verbose = FALSE
+  )
+
+  expect_equal(length(fit_crossfit$pseudo_outcomes), nrow(d$A))
+  expect_equal(length(fit_fold$pseudo_outcomes), nrow(d$A))
+  expect_equal(length(fit_all$pseudo_outcomes), nrow(d$A))
+  expect_equal(fit_default$pseudo_outcomes, fit_crossfit$pseudo_outcomes)
+  expect_equal(fit_crossfit$diagnostics$marginalization, "crossfit")
+  expect_equal(fit_fold$diagnostics$marginalization, "fold")
+  expect_equal(fit_all$diagnostics$marginalization, "all")
+})
+
 test_that("estimate_pseudo_outcomes validates inputs", {
   d <- target_sample_data(n = 20, seed = 6104)
 
@@ -149,6 +210,20 @@ test_that("estimate_pseudo_outcomes validates inputs", {
       verbose = FALSE
     ),
     "'gps_floor' must be a positive finite number",
+    fixed = TRUE
+  )
+  expect_error(
+    estimate_pseudo_outcomes(
+      Y = d$Y,
+      A = d$A,
+      C = d$C,
+      L = 1,
+      outcome_fitter = target_fit_linear,
+      gps_fitter = mvn_fitter,
+      marginalization = "bad",
+      verbose = FALSE
+    ),
+    "'arg' should be one of",
     fixed = TRUE
   )
 })

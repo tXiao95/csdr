@@ -66,6 +66,8 @@ compute_new_response_and_exposure <- function(Y, X, C,
 
   new_X_list <- lapply(method, function(m) X_mat)
   names(new_X_list) <- method
+  po_m_obs <- po_pi_obs <- rep(NA_real_, n)
+  po_nuisance_folds <- if ("PO" %in% method) vector("list", L) else NULL
   
   set.seed(seed)
   folds <- sample(rep(1:L, length.out = n))
@@ -117,22 +119,15 @@ compute_new_response_and_exposure <- function(Y, X, C,
         C_names = out_mod$C_names
       )
       class(po_nuisance) <- "po_nuisance"
-      po_pred <- predict_po_nuisance(
+      po_nuisance_folds[[k]] <- po_nuisance
+      po_pred <- predict_po_observed(
         nuisance = po_nuisance,
         A = X_test,
         C = C_test,
-        C_marginal = C_test,
-        gps_floor = po_gps_floor,
-        verbose = FALSE
-      )
-      new_Y_list[["PO"]][test_idx] <- compute_pseudo_outcomes(
-        Y = Y_test,
-        m_obs = po_pred$m_obs,
-        pi_obs = po_pred$pi_obs,
-        m_marginal = po_pred$m_marginal,
-        pi_marginal = po_pred$pi_marginal,
         gps_floor = po_gps_floor
       )
+      po_m_obs[test_idx] <- po_pred$m_obs
+      po_pi_obs[test_idx] <- po_pred$pi_obs
     }
     if ("RP" %in% method) {
       rp_pred <- predict_rp_nuisance(nuisance = C_mods, C = C_test)
@@ -145,6 +140,25 @@ compute_new_response_and_exposure <- function(Y, X, C,
       new_Y_list[["RP"]][test_idx] <- res_rp$Y_tilde
       new_X_list[["RP"]][test_idx, ] <- res_rp$A_tilde
     }
+  }
+
+  if ("PO" %in% method) {
+    po_marginal <- predict_po_crossfit_marginals(
+      nuisance_fits = list(folds = po_nuisance_folds),
+      A_targets = X_mat,
+      C = C_mat,
+      folds = folds,
+      gps_floor = po_gps_floor,
+      verbose = FALSE
+    )
+    new_Y_list[["PO"]] <- compute_pseudo_outcomes(
+      Y = Y,
+      m_obs = po_m_obs,
+      pi_obs = po_pi_obs,
+      m_marginal = po_marginal$m_marginal,
+      pi_marginal = po_marginal$pi_marginal,
+      gps_floor = po_gps_floor
+    )
   }
   
   # ---------------------------------------------------------

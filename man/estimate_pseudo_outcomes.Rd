@@ -14,6 +14,7 @@ estimate_pseudo_outcomes(
   gps_fitter = mvn_fitter,
   nuisance = NULL,
   C_marginal = C,
+  marginalization = c("crossfit", "fold", "all"),
   gps_floor = 1e-08,
   seed = NULL,
   return_nuisance = FALSE,
@@ -45,6 +46,13 @@ estimate_pseudo_outcomes(
 \item{nuisance}{Optional pre-fitted pseudo-outcome nuisance object.}
 
 \item{C_marginal}{Covariate rows used for empirical marginalization.}
+
+\item{marginalization}{Marginalization mode. \code{"crossfit"} treats each
+observed \code{A_j} as a fixed target and averages over all \code{C_i} using the
+nuisance model for \code{fold(i)}. \code{"fold"} averages only over the held-out
+fold for each target row, preserving the older fold-local finite-sample
+behavior. \code{"all"} uses \code{C_marginal} directly with the target row's fold
+nuisance model.}
 
 \item{gps_floor}{Positive floor applied to GPS predictions.}
 
