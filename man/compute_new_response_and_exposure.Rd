@@ -10,6 +10,7 @@ compute_new_response_and_exposure(
   C,
   method = c("RA"),
   L = 5,
+  folds = NULL,
   outcome_fitter = SL_outcome_fitter,
   C_fitter = SL_nuisance_fitter,
   gps_fitter = mvn_fitter,
@@ -17,7 +18,9 @@ compute_new_response_and_exposure(
   args_outcome = list(),
   args_C = list(),
   args_gps = list(),
-  args_ers = list()
+  args_ers = list(),
+  po_marginalization = NULL,
+  verbose = TRUE
 )
 }
 \arguments{
@@ -30,6 +33,8 @@ compute_new_response_and_exposure(
 \item{method}{String or vector indicating methods to use (e.g., "DR" or c("RA", "DR", "PO", "RP")).}
 
 \item{L}{Integer indicating the number of folds for cross-fitting. Defaults to 5.}
+
+\item{folds}{Optional fold assignments.}
 
 \item{outcome_fitter}{Function to train outcome models. Required for RA, DR, PO.}
 
@@ -46,6 +51,11 @@ compute_new_response_and_exposure(
 \item{args_gps}{List of additional arguments to pass to gps_fitter (e.g., list(method="linear")).}
 
 \item{args_ers}{List of additional arguments to pass to estimate_ERS (e.g., list(optimize_bw=TRUE)).}
+
+\item{po_marginalization}{Marginalization mode for PO targets. Defaults to
+\code{"crossfit"} through \code{\link[=csdr_target]{csdr_target()}}.}
+
+\item{verbose}{Logical; if \code{TRUE}, print progress messages.}
 }
 \value{
 A list containing \code{new_Y}, \code{new_X}, and \code{metadata}.

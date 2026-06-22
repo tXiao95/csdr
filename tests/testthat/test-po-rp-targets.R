@@ -385,6 +385,99 @@ test_that("legacy residualized-pair call path still returns aliases", {
   expect_equal(dim(out$Xtilde), dim(d$A))
 })
 
+test_that("csdr_target constructs individual method targets", {
+  d <- target_sample_data(n = 36, seed = 6251)
+
+  fit_ra <- csdr_target(
+    Y = d$Y,
+    A = d$A,
+    C = d$C,
+    methods = "RA",
+    L = 2,
+    outcome_fitter = target_fit_linear,
+    folds = rep(1:2, length.out = nrow(d$A)),
+    verbose = FALSE
+  )
+  fit_dr <- csdr_target(
+    Y = d$Y,
+    A = d$A,
+    C = d$C,
+    methods = "DR",
+    L = 2,
+    outcome_fitter = target_fit_linear,
+    gps_fitter = mvn_fitter,
+    folds = rep(1:2, length.out = nrow(d$A)),
+    args_gps = list(method_gps = "linear"),
+    verbose = FALSE
+  )
+  fit_po <- csdr_target(
+    Y = d$Y,
+    A = d$A,
+    C = d$C,
+    methods = "PO",
+    L = 2,
+    outcome_fitter = target_fit_linear,
+    gps_fitter = mvn_fitter,
+    folds = rep(1:2, length.out = nrow(d$A)),
+    args_gps = list(method_gps = "linear"),
+    verbose = FALSE
+  )
+  fit_rp <- csdr_target(
+    Y = d$Y,
+    A = d$A,
+    C = d$C,
+    methods = "RP",
+    L = 2,
+    C_fitter = target_fit_c_linear,
+    folds = rep(1:2, length.out = nrow(d$A)),
+    verbose = FALSE
+  )
+
+  expect_s3_class(fit_ra, "csdr_target")
+  expect_equal(names(fit_ra$new_Y), "RA")
+  expect_equal(length(fit_ra$new_Y$RA), nrow(d$A))
+  expect_equal(dim(fit_ra$new_A$RA), dim(d$A))
+  expect_equal(length(fit_dr$new_Y$DR), nrow(d$A))
+  expect_equal(dim(fit_dr$new_A$DR), dim(d$A))
+  expect_equal(length(fit_po$new_Y$PO), nrow(d$A))
+  expect_equal(dim(fit_po$new_A$PO), dim(d$A))
+  expect_equal(fit_po$diagnostics$po_marginalization, "crossfit")
+  expect_equal(length(fit_rp$new_Y$RP), nrow(d$A))
+  expect_equal(dim(fit_rp$new_A$RP), dim(d$A))
+  expect_false(isTRUE(all.equal(fit_rp$new_A$RP, d$A)))
+})
+
+test_that("csdr_target constructs all requested targets with shared folds", {
+  d <- target_sample_data(n = 36, seed = 6252)
+  folds <- rep(1:2, length.out = nrow(d$A))
+
+  fit <- csdr_target(
+    Y = d$Y,
+    A = d$A,
+    C = d$C,
+    methods = c("RA", "DR", "PO", "RP"),
+    L = 2,
+    folds = folds,
+    outcome_fitter = target_fit_linear,
+    gps_fitter = mvn_fitter,
+    C_fitter = target_fit_c_linear,
+    args_gps = list(method_gps = "linear"),
+    return_nuisance = TRUE,
+    verbose = FALSE
+  )
+
+  expect_equal(names(fit$new_Y), c("RA", "DR", "PO", "RP"))
+  expect_equal(names(fit$new_A), c("RA", "DR", "PO", "RP"))
+  expect_equal(fit$folds, folds)
+  expect_equal(fit$methods, c("RA", "DR", "PO", "RP"))
+  expect_equal(fit$diagnostics$L, 2L)
+  expect_equal(dim(fit$new_A$RA), dim(d$A))
+  expect_equal(dim(fit$new_A$DR), dim(d$A))
+  expect_equal(dim(fit$new_A$PO), dim(d$A))
+  expect_equal(dim(fit$new_A$RP), dim(d$A))
+  expect_false(is.null(fit$nuisance))
+})
+
 test_that("compute_new_response_and_exposure works for PO, RP, and combined targets", {
   d <- target_sample_data(n = 36, seed = 6301)
 
