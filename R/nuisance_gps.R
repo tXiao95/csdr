@@ -85,6 +85,7 @@ predict.gps_model <- function(object, newdata, ...) {
 #' @param C Numeric matrix or data frame of observed confounders.
 #' @param X Compatibility alias for `A`.
 #' @param method_gps String in `c("linear","SuperLearner")`.
+#' @param delta_n Positive lower bound for density predictions.
 #' @param ... Additional arguments passed to the density fitter.
 mvn_gps_fitter <- function(A = NULL, C, X = NULL,
                            method_gps = c("linear", "SuperLearner"),

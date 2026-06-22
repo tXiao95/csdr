@@ -82,16 +82,20 @@ test_that("csdr main public API returns a csdr_fit for one variant", {
       d = 1,
       L = 2L,
       seed = 3030,
-      fitters = list(outcome = fit_linear),
-      target_control = list(args_gps = list(method_gps = "linear")),
+      learners = csdr_learners(
+        outcome = custom_regression(fit_linear, label = "linear outcome")
+      ),
       verbose = FALSE
     )
   )
 
   expect_s3_class(fit, "csdr_fit")
   expect_s3_class(fit$target, "csdr_target")
+  expect_s3_class(fit$learners, "csdr_learners")
   expect_equal(fit$variants, "DR")
   expect_equal(names(fit$fits), "DR")
+  expect_true(is.data.frame(fit$learner_summary))
+  expect_true("outcome" %in% fit$learner_summary$role)
   expect_equal(nrow(fit$summary), 1L)
   expect_equal(fit$summary$variant, "DR")
   expect_equal(fit$summary$d_hat, 1L)
@@ -117,8 +121,10 @@ test_that("csdr supports multiple variants and storage controls", {
       d = 1,
       L = 2L,
       seed = 3031,
-      fitters = list(outcome = fit_linear, C = fit_c_linear),
-      target_control = list(args_gps = list(method_gps = "linear")),
+      learners = csdr_learners(
+        outcome = custom_regression(fit_linear, label = "linear outcome"),
+        rp_y = custom_regression(fit_c_linear, label = "linear C regression")
+      ),
       keep_mave = FALSE,
       verbose = FALSE
     )
@@ -137,6 +143,11 @@ test_that("csdr supports multiple variants and storage controls", {
   expect_true(is.matrix(fit$fits$DR$score))
   expect_equal(fit$summary$target_exposure[fit$summary$variant == "RP"], "residualized_A")
   expect_equal(fit$summary$target_exposure[fit$summary$variant == "DR"], "A")
+  expect_true(fit$learner_summary$used[fit$learner_summary$role == "rp_a"])
+  expect_match(
+    fit$learner_summary$details[fit$learner_summary$role == "rp_a"],
+    "not separately wired"
+  )
 })
 
 test_that("csdr targets accessor errors when targets are not retained", {
@@ -151,7 +162,9 @@ test_that("csdr targets accessor errors when targets are not retained", {
       d = 1,
       L = 2L,
       seed = 3032,
-      fitters = list(outcome = fit_linear),
+      learners = csdr_learners(
+        outcome = custom_regression(fit_linear, label = "linear outcome")
+      ),
       keep_targets = FALSE,
       verbose = FALSE
     )
@@ -159,6 +172,91 @@ test_that("csdr targets accessor errors when targets are not retained", {
 
   expect_null(fit$fits$RA$target_Y)
   expect_error(targets(fit, variant = "RA"), "Targets were not retained")
+})
+
+test_that("csdr works with default and modified learner specs", {
+  d <- sample_data(n = 36, seed = 3033)
+
+  fit_default <- suppressWarnings(
+    csdr(
+      Y = d$Y,
+      A = d$X,
+      C = d$C,
+      variants = "DR",
+      d = 1,
+      L = 2L,
+      seed = 3033,
+      verbose = FALSE
+    )
+  )
+  fit_glm <- suppressWarnings(
+    csdr(
+      Y = d$Y,
+      A = d$X,
+      C = d$C,
+      variants = "DR",
+      d = 1,
+      L = 2L,
+      seed = 3033,
+      learners = csdr_learners(sl_library = c("SL.glm")),
+      verbose = FALSE
+    )
+  )
+
+  expect_s3_class(fit_default, "csdr_fit")
+  expect_s3_class(fit_glm, "csdr_fit")
+  expect_equal(
+    fit_default$learner_summary$engine[fit_default$learner_summary$role == "outcome"],
+    "SuperLearner"
+  )
+  expect_equal(
+    fit_default$learner_summary$engine[fit_default$learner_summary$role == "gps"],
+    "MVN GPS"
+  )
+  expect_equal(fit_glm$learners$outcome$args$SL.library, "SL.glm")
+})
+
+test_that("csdr learner-choice messages respect verbose", {
+  d <- sample_data(n = 32, seed = 3034)
+
+  quiet_messages <- character()
+  withCallingHandlers(
+    suppressWarnings(
+      csdr(
+        Y = d$Y,
+        A = d$X,
+        C = d$C,
+        variants = "DR",
+        d = 1,
+        L = 2L,
+        seed = 3034,
+        learners = csdr_learners(sl_library = c("SL.glm")),
+        verbose = FALSE
+      )
+    ),
+    message = function(m) {
+      quiet_messages <<- c(quiet_messages, conditionMessage(m))
+      invokeRestart("muffleMessage")
+    }
+  )
+
+  expect_false(any(grepl("CSDR learner choices", quiet_messages, fixed = TRUE)))
+  expect_message(
+    suppressWarnings(
+      csdr(
+        Y = d$Y,
+        A = d$X,
+        C = d$C,
+        variants = "DR",
+        d = 1,
+        L = 2L,
+        seed = 3034,
+        learners = csdr_learners(sl_library = c("SL.glm")),
+        verbose = TRUE
+      )
+    ),
+    "CSDR learner choices"
+  )
 })
 
 test_that("estimate_ERS RA returns finite numeric vector and is reproducible", {

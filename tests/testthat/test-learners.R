@@ -28,6 +28,13 @@ test_that("learner spec constructors validate and store expected fields", {
   expect_error(custom_gps("not a function"), "'fitter' must be a function")
   expect_error(custom_regression(function(...) NULL, args = 1), "'args' must be a list")
   expect_error(custom_gps(function(...) NULL, args = 1), "'args' must be a list")
+
+  custom_gps_fit <- custom_gps(function(A, C, ...) {
+    structure(list(n = nrow(A), q = ncol(C)), class = "toy_gps")
+  })
+  toy <- custom_gps_fit$fitter(X = data.frame(A1 = 1:3), C = data.frame(C1 = 4:6))
+  expect_s3_class(toy, "toy_gps")
+  expect_equal(toy$n, 3L)
 })
 
 test_that("csdr_learners returns and validates default learner roles", {

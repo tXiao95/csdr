@@ -22,6 +22,8 @@ mvn_gps_fitter(
 
 \item{method_gps}{String in \code{c("linear","SuperLearner")}.}
 
+\item{delta_n}{Positive lower bound for density predictions.}
+
 \item{...}{Additional arguments passed to the density fitter.}
 }
 \description{

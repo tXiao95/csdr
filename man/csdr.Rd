@@ -13,7 +13,7 @@ csdr(
   max_dim = NULL,
   L = 5,
   seed = NULL,
-  fitters = list(),
+  learners = csdr_learners(),
   target_control = list(),
   mave_control = list(),
   keep_targets = TRUE,
@@ -43,8 +43,7 @@ cross-fitting.}
 
 \item{seed}{Optional random seed used when folds are generated.}
 
-\item{fitters}{Optional named list of nuisance fitters. Supported names are
-\code{outcome}, \code{gps}, and \code{C}.}
+\item{learners}{Learner specifications created by \code{\link[=csdr_learners]{csdr_learners()}}.}
 
 \item{target_control}{Optional named list passed to \code{\link[=csdr_target]{csdr_target()}}. Supported
 entries include \code{folds}, \code{args_outcome}, \code{args_gps}, \code{args_C}, \code{args_ers},
@@ -77,6 +76,42 @@ each requested target variant.
 \dontrun{
 fit <- csdr(Y, A, C)
 fit_all <- csdr(Y, A, C, variants = c("RA", "DR", "PO", "RP"))
+
+fit_glm <- csdr(
+  Y, A, C,
+  learners = csdr_learners(sl_library = c("SL.glm", "SL.ranger", "SL.xgboost"))
+)
+
+fit_outcome <- csdr(
+  Y, A, C,
+  learners = csdr_learners(
+    outcome = sl_regression(SL.library = c("SL.glm", "SL.ranger"))
+  )
+)
+
+fit_gps <- csdr(
+  Y, A, C,
+  learners = csdr_learners(
+    gps = mvn_gps(method = "SuperLearner", SL.library = c("SL.glm", "SL.ranger"))
+  )
+)
+
+my_fitter <- function(Y, W, ...) {
+  fit <- stats::lm(Y ~ ., data = data.frame(Y = Y, W))
+  structure(list(fit = fit), class = "my_regression")
+}
+predict.my_regression <- function(object, newdata, ...) {
+  as.numeric(stats::predict(object$fit, newdata = as.data.frame(newdata)))
+}
+fit_custom <- csdr(
+  Y, A, C,
+  learners = csdr_learners(
+    outcome = custom_regression(my_fitter, label = "custom lm")
+  )
+)
+
+# Custom GPS learners should return fitted density objects whose predict()
+# method returns numeric conditional density estimates.
 coef(fit, variant = "DR")
 }
 

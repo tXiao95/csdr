@@ -105,11 +105,20 @@ custom_gps <- function(fitter, args = list(), label = NULL) {
   if (!is.list(args)) {
     stop("'args' must be a list.", call. = FALSE)
   }
+  gps_fitter <- function(A = NULL, C, X = NULL, ...) {
+    if (is.null(A)) {
+      A <- X
+    }
+    if (is.null(A)) {
+      stop("'A' must be supplied.", call. = FALSE)
+    }
+    fitter(A = A, C = C, ...)
+  }
   out <- list(
     type = "gps",
     engine = "custom",
     label = label %||% "custom GPS",
-    fitter = fitter,
+    fitter = gps_fitter,
     args = args,
     summary = list(args = names(args)),
     is_default = FALSE

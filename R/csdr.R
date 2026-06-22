@@ -17,8 +17,7 @@
 #' @param L Number of folds for target construction. `L = 1` disables
 #'   cross-fitting.
 #' @param seed Optional random seed used when folds are generated.
-#' @param fitters Optional named list of nuisance fitters. Supported names are
-#'   `outcome`, `gps`, and `C`.
+#' @param learners Learner specifications created by [csdr_learners()].
 #' @param target_control Optional named list passed to [csdr_target()]. Supported
 #'   entries include `folds`, `args_outcome`, `args_gps`, `args_C`, `args_ers`,
 #'   and `po_marginalization`.
@@ -38,6 +37,42 @@
 #' \dontrun{
 #' fit <- csdr(Y, A, C)
 #' fit_all <- csdr(Y, A, C, variants = c("RA", "DR", "PO", "RP"))
+#'
+#' fit_glm <- csdr(
+#'   Y, A, C,
+#'   learners = csdr_learners(sl_library = c("SL.glm", "SL.ranger", "SL.xgboost"))
+#' )
+#'
+#' fit_outcome <- csdr(
+#'   Y, A, C,
+#'   learners = csdr_learners(
+#'     outcome = sl_regression(SL.library = c("SL.glm", "SL.ranger"))
+#'   )
+#' )
+#'
+#' fit_gps <- csdr(
+#'   Y, A, C,
+#'   learners = csdr_learners(
+#'     gps = mvn_gps(method = "SuperLearner", SL.library = c("SL.glm", "SL.ranger"))
+#'   )
+#' )
+#'
+#' my_fitter <- function(Y, W, ...) {
+#'   fit <- stats::lm(Y ~ ., data = data.frame(Y = Y, W))
+#'   structure(list(fit = fit), class = "my_regression")
+#' }
+#' predict.my_regression <- function(object, newdata, ...) {
+#'   as.numeric(stats::predict(object$fit, newdata = as.data.frame(newdata)))
+#' }
+#' fit_custom <- csdr(
+#'   Y, A, C,
+#'   learners = csdr_learners(
+#'     outcome = custom_regression(my_fitter, label = "custom lm")
+#'   )
+#' )
+#'
+#' # Custom GPS learners should return fitted density objects whose predict()
+#' # method returns numeric conditional density estimates.
 #' coef(fit, variant = "DR")
 #' }
 #'
@@ -51,7 +86,7 @@ csdr <- function(
   max_dim = NULL,
   L = 5,
   seed = NULL,
-  fitters = list(),
+  learners = csdr_learners(),
   target_control = list(),
   mave_control = list(),
   keep_targets = TRUE,
@@ -68,7 +103,7 @@ csdr <- function(
     d = d,
     max_dim = max_dim,
     L = L,
-    fitters = fitters,
+    learners = learners,
     target_control = target_control,
     mave_control = mave_control,
     keep_targets = keep_targets,
@@ -76,6 +111,7 @@ csdr <- function(
     keep_nuisance = keep_nuisance,
     verbose = verbose
   )
+  validate_csdr_learners(learners)
 
   data <- normalize_ers_inputs(Y = Y, A = A, C = C, a_eval = A)
   A_mat <- as.matrix(data$A)
@@ -88,6 +124,12 @@ csdr <- function(
     stop("'max_dim' cannot exceed the number of exposure columns.", call. = FALSE)
   }
 
+  learner_summary <- summarize_csdr_learners(learners = learners, variants = variants)
+  if (isTRUE(verbose)) {
+    announce_csdr_learners(learner_summary)
+  }
+  learner_args <- as_csdr_target_args(learners = learners, target_control = target_control)
+
   target_obj <- csdr_target(
     Y = data$Y,
     A = data$A,
@@ -95,12 +137,12 @@ csdr <- function(
     methods = variants,
     L = L,
     folds = target_control$folds,
-    outcome_fitter = fitters$outcome %||% SL_outcome_fitter,
-    gps_fitter = fitters$gps %||% mvn_fitter,
-    C_fitter = fitters$C %||% SL_nuisance_fitter,
-    args_outcome = target_control$args_outcome %||% list(),
-    args_gps = target_control$args_gps %||% list(),
-    args_C = target_control$args_C %||% list(),
+    outcome_fitter = learner_args$outcome_fitter,
+    gps_fitter = learner_args$gps_fitter,
+    C_fitter = learner_args$C_fitter,
+    args_outcome = learner_args$args_outcome,
+    args_gps = learner_args$args_gps,
+    args_C = learner_args$args_C,
     args_ers = target_control$args_ers %||% list(),
     po_marginalization = target_control$po_marginalization %||% "crossfit",
     seed = seed,
@@ -153,6 +195,8 @@ csdr <- function(
     target = target_obj,
     fits = fits,
     summary = summary_table,
+    learners = learners,
+    learner_summary = learner_summary,
     control = list(
       L = L,
       seed = seed,
@@ -306,7 +350,104 @@ coerce_mave_beta <- function(candidate, d_hat, p) {
   NULL
 }
 
-validate_csdr_options <- function(Y, d, max_dim, L, fitters, target_control,
+as_csdr_target_args <- function(learners, target_control) {
+  # TODO: pass rp_y and rp_a separately once RP internals support distinct
+  # C-only learners for Y and A residualization. For now csdr_target() accepts
+  # one shared C_fitter, so rp_y is the canonical learner.
+  list(
+    outcome_fitter = learners$outcome$fitter,
+    gps_fitter = learners$gps$fitter,
+    C_fitter = learners$rp_y$fitter,
+    args_outcome = utils::modifyList(
+      learners$outcome$args,
+      target_control$args_outcome %||% list()
+    ),
+    args_gps = utils::modifyList(
+      learners$gps$args,
+      target_control$args_gps %||% list()
+    ),
+    args_C = utils::modifyList(
+      learners$rp_y$args,
+      target_control$args_C %||% list()
+    )
+  )
+}
+
+summarize_csdr_learners <- function(learners, variants) {
+  used <- list(
+    outcome = any(c("RA", "DR", "PO") %in% variants),
+    gps = any(c("DR", "PO") %in% variants),
+    rp_y = "RP" %in% variants,
+    rp_a = "RP" %in% variants
+  )
+
+  out <- do.call(
+    rbind,
+    lapply(names(used), function(role) {
+      learner <- learners[[role]]
+      details <- describe_csdr_learner(learner)
+      if (role == "rp_a") {
+        details <- paste(details, "not separately wired; using rp_y learner", sep = "; ")
+      }
+      data.frame(
+        role = role,
+        used = used[[role]],
+        engine = learner$engine,
+        label = learner$label,
+        details = details,
+        is_default = isTRUE(learner$is_default),
+        stringsAsFactors = FALSE
+      )
+    })
+  )
+  rownames(out) <- NULL
+  out
+}
+
+describe_csdr_learner <- function(learner) {
+  if (identical(learner$engine, "SuperLearner")) {
+    return(paste(
+      "SL.library:",
+      paste(learner$summary$SL.library, collapse = ", ")
+    ))
+  }
+  if (identical(learner$engine, "MVN GPS")) {
+    return(sprintf(
+      "method_gps: %s; density_floor: %s",
+      learner$summary$method_gps,
+      format(learner$summary$density_floor, scientific = TRUE)
+    ))
+  }
+  arg_names <- learner$summary$args
+  if (length(arg_names) > 0L) {
+    return(paste("args:", paste(arg_names, collapse = ", ")))
+  }
+  "no stored args"
+}
+
+announce_csdr_learners <- function(learner_summary) {
+  message("CSDR learner choices:")
+  for (i in seq_len(nrow(learner_summary))) {
+    role <- learner_summary$role[[i]]
+    label <- switch(
+      role,
+      outcome = "Outcome regression E[Y | A, C]",
+      gps = "GPS f(A | C)",
+      rp_y = "RP regression E[Y | C]",
+      rp_a = "RP regression E[A_j | C]",
+      role
+    )
+    if (!learner_summary$used[[i]]) {
+      message(sprintf("- %s: not used", label))
+    } else {
+      message(sprintf("- %s: %s", label, learner_summary$label[[i]]))
+      message(sprintf("  %s", learner_summary$details[[i]]))
+    }
+  }
+  invisible(learner_summary)
+}
+
+validate_csdr_options <- function(Y, d, max_dim, L, learners, target_control,
                                   mave_control, keep_targets, keep_mave,
                                   keep_nuisance, verbose) {
   if (!is.numeric(Y) || length(Y) < 1L || anyNA(Y)) {
@@ -324,8 +465,8 @@ validate_csdr_options <- function(Y, d, max_dim, L, fitters, target_control,
        max_dim < 1L || max_dim != as.integer(max_dim))) {
     stop("'max_dim' must be a positive integer when supplied.", call. = FALSE)
   }
-  if (!is.list(fitters)) {
-    stop("'fitters' must be a list.", call. = FALSE)
+  if (!inherits(learners, "csdr_learners")) {
+    stop("'learners' must be created by csdr_learners().", call. = FALSE)
   }
   if (!is.list(target_control)) {
     stop("'target_control' must be a list.", call. = FALSE)
@@ -364,7 +505,8 @@ summary.csdr_fit <- function(object, ...) {
     summary = object$summary,
     input = object$input,
     variants = object$variants,
-    target_diagnostics = object$target$diagnostics
+    target_diagnostics = object$target$diagnostics,
+    learner_summary = object$learner_summary
   )
   class(out) <- "summary.csdr_fit"
   out
