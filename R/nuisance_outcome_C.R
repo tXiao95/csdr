@@ -75,7 +75,21 @@ predict.nuisance_C_model <- function(object, newdata, ...) {
   return(as.numeric(preds))
 }
 
-# Define the wrapper for SuperLearner
-SL_nuisance_fitter <- function(target, C_df, SL.lib = c("SL.glm", "SL.glmnet", "SL.xgboost", "SL.earth"), ...) {
-  SuperLearner::SuperLearner(Y = target, X = C_df, family = stats::gaussian(), SL.lib = SL.lib, ...)
+# Backward-compatible wrapper for C-only SuperLearner nuisance regressions.
+SL_nuisance_fitter <- function(target,
+                               C_df,
+                               SL.library = csdr_default_sl_library(),
+                               family = stats::gaussian(),
+                               SL.lib = NULL,
+                               env = NULL,
+                               ...) {
+  sl_regression_fitter(
+    Y = target,
+    W = C_df,
+    SL.library = SL.library,
+    family = family,
+    SL.lib = SL.lib,
+    env = env,
+    ...
+  )
 }

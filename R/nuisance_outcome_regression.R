@@ -91,7 +91,72 @@ predict.outcome_model <- function(object, newdata, ...) {
   return(as.numeric(preds))
 }
 
-# Define the wrapper
-SL_outcome_fitter <- function(Y, XC_df, SL.lib = c("SL.glm", "SL.glmnet", "SL.xgboost", "SL.earth"), ...) {
-  SuperLearner::SuperLearner(Y = Y, X = XC_df, family = stats::gaussian(), SL.lib = SL.lib, ...)
+# Low-level SuperLearner regression engine.
+sl_regression_fitter <- function(Y,
+                                 W,
+                                 SL.library = csdr_default_sl_library(),
+                                 family = stats::gaussian(),
+                                 SL.lib = NULL,
+                                 env = NULL,
+                                 ...) {
+  if (!is.null(SL.lib) && missing(SL.library)) {
+    SL.library <- SL.lib
+  }
+  if (is.null(env)) {
+    env <- asNamespace("SuperLearner")
+  }
+  SuperLearner::SuperLearner(
+    Y = Y,
+    X = as.data.frame(W),
+    family = family,
+    SL.library = resolve_available_sl_library(SL.library),
+    env = env,
+    ...
+  )
+}
+
+# Backward-compatible wrapper.
+SL_outcome_fitter <- function(Y,
+                              XC_df,
+                              SL.library = csdr_default_sl_library(),
+                              family = stats::gaussian(),
+                              SL.lib = NULL,
+                              env = NULL,
+                              ...) {
+  sl_regression_fitter(
+    Y = Y,
+    W = XC_df,
+    SL.library = SL.library,
+    family = family,
+    SL.lib = SL.lib,
+    env = env,
+    ...
+  )
+}
+
+resolve_available_sl_library <- function(SL.library) {
+  known_package_requirements <- c(
+    SL.glmnet = "glmnet",
+    SL.xgboost = "xgboost",
+    SL.earth = "earth",
+    SL.ranger = "ranger"
+  )
+  keep <- vapply(SL.library, function(wrapper) {
+    pkg <- unname(known_package_requirements[wrapper])
+    if (is.na(pkg)) {
+      pkg <- NULL
+    }
+    if (!is.null(pkg) && !requireNamespace(pkg, quietly = TRUE)) {
+      return(FALSE)
+    }
+    if (is.null(pkg)) {
+      return(TRUE)
+    }
+    exists(wrapper, envir = asNamespace("SuperLearner"), inherits = FALSE)
+  }, logical(1))
+  out <- SL.library[keep]
+  if (length(out) == 0L) {
+    stop("No requested SuperLearner wrappers are available.", call. = FALSE)
+  }
+  out
 }

@@ -4,7 +4,7 @@
 \alias{predict.mvn_inner}
 \title{Predict Method for Inner MVN}
 \usage{
-\method{predict}{mvn_inner}(object, newdata, delta_n = 1e-16, ...)
+\method{predict}{mvn_inner}(object, newdata, delta_n = object$density_floor \%||\% 1e-16, ...)
 }
 \arguments{
 \item{object}{An object of class "mvn_inner".}

@@ -81,16 +81,29 @@ predict.gps_model <- function(object, newdata, ...) {
 
 #' Inner Fitter for MVN GPS
 #'
-#' @param X Numeric matrix or data frame of observed treatments.
+#' @param A Numeric matrix or data frame of observed treatments.
 #' @param C Numeric matrix or data frame of observed confounders.
+#' @param X Compatibility alias for `A`.
 #' @param method_gps String in `c("linear","SuperLearner")`.
 #' @param ... Additional arguments passed to the density fitter.
-mvn_fitter <- function(X, C, method_gps = c("linear", "SuperLearner"), ...) {
+mvn_gps_fitter <- function(A = NULL, C, X = NULL,
+                           method_gps = c("linear", "SuperLearner"),
+                           delta_n = 1e-16, ...) {
+  if (is.null(A)) {
+    A <- X
+  }
+  if (is.null(A)) {
+    stop("'A' must be supplied.", call. = FALSE)
+  }
+  if (!is.numeric(delta_n) || length(delta_n) != 1L ||
+      is.na(delta_n) || !is.finite(delta_n) || delta_n <= 0) {
+    stop("'delta_n' must be a positive finite number.", call. = FALSE)
+  }
   method_gps <- match.arg(method_gps)
 
   # Data is already clean from the wrapper
-  p <- ncol(X)
-  X_mat <- as.matrix(X)
+  p <- ncol(A)
+  X_mat <- as.matrix(A)
   C_df <- C # SuperLearner and lm both prefer data frames for predictors
 
   if (method_gps == "linear") {
@@ -102,7 +115,11 @@ mvn_fitter <- function(X, C, method_gps = c("linear", "SuperLearner"), ...) {
     resids <- matrix(NA, nrow = nrow(X_mat), ncol = p)
 
     for (j in 1:p) {
-      sl_fit <- SuperLearner::SuperLearner(Y = X_mat[, j], X = C_df, family = stats::gaussian(), ...)
+      sl_fit <- sl_regression_fitter(
+        Y = X_mat[, j],
+        W = C_df,
+        ...
+      )
       inner_fit[[paste0("X", j)]] <- sl_fit
       resids[, j] <- X_mat[, j] - sl_fit$SL.predict
     }
@@ -115,11 +132,17 @@ mvn_fitter <- function(X, C, method_gps = c("linear", "SuperLearner"), ...) {
     sigma_hat = sigma_hat,
     method = method_gps,
     p = p,
-    X_names = colnames(X),
-    C_names = colnames(C)
+    X_names = colnames(A),
+    C_names = colnames(C),
+    density_floor = delta_n
   )
   class(res) <- "mvn_inner"
   return(res)
+}
+
+# Backward-compatible MVN GPS fitter name.
+mvn_fitter <- function(X, C, method_gps = c("linear", "SuperLearner"), ...) {
+  mvn_gps_fitter(A = X, C = C, method_gps = method_gps, ...)
 }
 
 #' Predict Method for Inner MVN
@@ -131,7 +154,7 @@ mvn_fitter <- function(X, C, method_gps = c("linear", "SuperLearner"), ...) {
 #'
 #' @exportS3Method stats::predict
 
-predict.mvn_inner <- function(object, newdata, delta_n = 1e-16, ...) {
+predict.mvn_inner <- function(object, newdata, delta_n = object$density_floor %||% 1e-16, ...) {
   # newdata is already clean and correctly ordered by predict.gps_model
   X_new <- as.matrix(newdata[, object$X_names, drop = FALSE])
   C_new <- newdata[, object$C_names, drop = FALSE]
