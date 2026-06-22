@@ -2,24 +2,63 @@
 % Please edit documentation in R/estimate_residualized_pair.R
 \name{estimate_residualized_pair}
 \alias{estimate_residualized_pair}
-\title{Compute Residualized Pair}
+\title{Estimate residualized response and exposure pairs for CSDR}
 \usage{
-estimate_residualized_pair(Y, X, C, C_models)
+estimate_residualized_pair(
+  Y,
+  A = NULL,
+  C,
+  L = 5,
+  folds = NULL,
+  C_fitter = SL_nuisance_fitter,
+  y_fitter = C_fitter,
+  a_fitter = C_fitter,
+  nuisance = NULL,
+  seed = NULL,
+  return_nuisance = FALSE,
+  verbose = TRUE,
+  args_y = list(),
+  args_a = list(),
+  X = NULL,
+  C_models = NULL
+)
 }
 \arguments{
-\item{Y}{Numeric vector of observed outcomes (length n).}
+\item{Y}{Numeric outcome vector.}
 
-\item{X}{Numeric matrix or data frame of observed treatments (n x p).}
+\item{A}{Numeric matrix or data frame of observed exposures.}
 
-\item{C}{Numeric matrix or data frame of observed confounders (n x q).}
+\item{C}{Numeric matrix or data frame of covariates.}
 
-\item{C_models}{A list containing pre-fitted nuisance models:
-\code{C_models$Y_model} (predicts E(Y | C)) and
-\code{C_models$X_models} (a list of p models predicting E(X_i | C)).}
+\item{L}{Number of folds. \code{L = 1} disables cross-fitting.}
+
+\item{folds}{Optional fold assignments.}
+
+\item{C_fitter}{Default fitter used for both residualization models.}
+
+\item{y_fitter}{Function used to fit \code{E[Y | C]}.}
+
+\item{a_fitter}{Function used to fit each \code{E[A_j | C]}.}
+
+\item{nuisance}{Optional pre-fitted residualized-pair nuisance object.}
+
+\item{seed}{Optional random seed for fold generation.}
+
+\item{return_nuisance}{Logical; if \code{TRUE}, return nuisance fits.}
+
+\item{verbose}{Logical; if \code{TRUE}, print progress messages.}
+
+\item{args_y}{Additional arguments passed to \code{y_fitter}.}
+
+\item{args_a}{Additional arguments passed to \code{a_fitter}.}
+
+\item{X}{Deprecated compatibility alias for \code{A}.}
+
+\item{C_models}{Deprecated compatibility alias for a pre-fitted RP nuisance.}
 }
 \value{
-A list containing two objects: \code{Ytilde} (numeric vector) and \code{Xtilde} (numeric matrix).
+An S3 object of class \code{"rp_fit"} and \code{"csdr_target"}.
 }
 \description{
-Compute Residualized Pair
+Estimate residualized response and exposure pairs for CSDR
 }

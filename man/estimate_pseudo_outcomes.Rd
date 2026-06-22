@@ -2,26 +2,75 @@
 % Please edit documentation in R/estimate_pseudo_outcomes.R
 \name{estimate_pseudo_outcomes}
 \alias{estimate_pseudo_outcomes}
-\title{Compute Doubly Robust Pseudo-Outcomes from Kennedy et al. (2017) JRSS-B}
+\title{Estimate pseudo-outcomes for CSDR target construction}
 \usage{
-estimate_pseudo_outcomes(Y, X, C, out_model, gps_model, delta_n = 1e-16)
+estimate_pseudo_outcomes(
+  Y,
+  A = NULL,
+  C,
+  L = 5,
+  folds = NULL,
+  outcome_fitter = SL_outcome_fitter,
+  gps_fitter = mvn_fitter,
+  nuisance = NULL,
+  C_marginal = C,
+  gps_floor = 1e-08,
+  seed = NULL,
+  return_nuisance = FALSE,
+  verbose = TRUE,
+  args_outcome = list(),
+  args_gps = list(),
+  X = NULL,
+  out_model = NULL,
+  gps_model = NULL,
+  delta_n = NULL,
+  chunk_size = NULL
+)
 }
 \arguments{
-\item{Y}{Numeric vector of observed outcomes (length n).}
+\item{Y}{Numeric outcome vector.}
 
-\item{X}{Numeric matrix or data frame of observed treatments (n x p).}
+\item{A}{Numeric matrix or data frame of observed exposures.}
 
-\item{C}{Numeric matrix or data frame of observed confounders (n x q).}
+\item{C}{Numeric matrix or data frame of covariates.}
 
-\item{out_model}{An S3 object of class "outcome_model".}
+\item{L}{Number of folds. \code{L = 1} disables cross-fitting.}
 
-\item{gps_model}{An S3 object representing a global conditional density model.}
+\item{folds}{Optional fold assignments.}
 
-\item{delta_n}{Small positive threshold to floor propensity scores. Defaults to 1e-16.}
+\item{outcome_fitter}{Function used by \code{\link[=outcome_model]{outcome_model()}}.}
+
+\item{gps_fitter}{Function used by \code{\link[=gps_model]{gps_model()}}.}
+
+\item{nuisance}{Optional pre-fitted pseudo-outcome nuisance object.}
+
+\item{C_marginal}{Covariate rows used for empirical marginalization.}
+
+\item{gps_floor}{Positive floor applied to GPS predictions.}
+
+\item{seed}{Optional random seed for fold generation.}
+
+\item{return_nuisance}{Logical; if \code{TRUE}, return nuisance fits.}
+
+\item{verbose}{Logical; if \code{TRUE}, print progress messages.}
+
+\item{args_outcome}{Additional arguments passed to \code{outcome_fitter}.}
+
+\item{args_gps}{Additional arguments passed to \code{gps_fitter}.}
+
+\item{X}{Deprecated compatibility alias for \code{A}.}
+
+\item{out_model}{Deprecated pre-fitted outcome model argument.}
+
+\item{gps_model}{Deprecated pre-fitted GPS model argument.}
+
+\item{delta_n}{Deprecated compatibility alias for \code{gps_floor}.}
+
+\item{chunk_size}{Optional chunk size for future batched prediction.}
 }
 \value{
-A numeric vector of pseudo-outcomes (length n).
+An S3 object of class \code{"po_fit"} and \code{"csdr_target"}.
 }
 \description{
-Compute Doubly Robust Pseudo-Outcomes from Kennedy et al. (2017) JRSS-B
+Estimate pseudo-outcomes for CSDR target construction
 }

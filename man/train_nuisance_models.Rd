@@ -2,24 +2,24 @@
 % Please edit documentation in R/estimate_residualized_pair.R
 \name{train_nuisance_models}
 \alias{train_nuisance_models}
-\title{Train all Nuisance Models E(Y | C) and E(X_i | C)}
+\title{Train all nuisance models for residualized-pair construction}
 \usage{
 train_nuisance_models(Y, X, C, fitter, ...)
 }
 \arguments{
-\item{Y}{Numeric vector of outcomes.}
+\item{Y}{Numeric outcome vector.}
 
-\item{X}{Numeric matrix of treatments.}
+\item{X}{Deprecated exposure argument name.}
 
-\item{C}{Numeric matrix of confounders.}
+\item{C}{Numeric matrix or data frame of covariates.}
 
-\item{fitter}{The wrapper function to train the models (e.g., SL_nuisance_fitter).}
+\item{fitter}{Fitter used for both outcome and exposure nuisance models.}
 
-\item{...}{Additional arguments passed to the fitter.}
+\item{...}{Additional arguments passed to \code{fitter}.}
 }
 \value{
-A list containing $Y_model and $X_models.
+A residualized-pair nuisance object with legacy \code{X_models} alias.
 }
 \description{
-Train all Nuisance Models E(Y | C) and E(X_i | C)
+Train all nuisance models for residualized-pair construction
 }
