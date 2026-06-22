@@ -15,6 +15,10 @@ fit_linear <- function(Y, XC_df, ...) {
   lm(Y ~ ., data = as.data.frame(XC_df))
 }
 
+fit_c_linear <- function(target, C_df, ...) {
+  lm(target ~ ., data = as.data.frame(C_df))
+}
+
 test_that("crossfit_ERS RA smoke test is deterministic and structured", {
   d <- sample_data()
   x_eval <- d$X[1:10, , drop = FALSE]
@@ -66,52 +70,95 @@ test_that("outcome_model and predict output match expectation", {
   expect_false(anyNA(pred))
 })
 
-test_that("csdr main public API is deterministic for RA and returns expected structure", {
+test_that("csdr main public API returns a csdr_fit for one variant", {
   d <- sample_data(seed = 3030)
-  set.seed(3030)
 
-  csdr_out1 <- suppressWarnings(
+  fit <- suppressWarnings(
     csdr(
-    Y = d$Y,
-    X = d$X,
-    C = d$C,
-    method = "RA",
-    args_compute_new_response = list(
+      Y = d$Y,
+      A = d$X,
+      C = d$C,
+      variants = "DR",
+      d = 1,
       L = 2L,
-      outcome_fitter = fit_linear,
-      seed = 3030
-    )
+      seed = 3030,
+      fitters = list(outcome = fit_linear),
+      target_control = list(args_gps = list(method_gps = "linear")),
+      verbose = FALSE
     )
   )
 
-  set.seed(3030)
-  csdr_out2 <- suppressWarnings(
+  expect_s3_class(fit, "csdr_fit")
+  expect_s3_class(fit$target, "csdr_target")
+  expect_equal(fit$variants, "DR")
+  expect_equal(names(fit$fits), "DR")
+  expect_equal(nrow(fit$summary), 1L)
+  expect_equal(fit$summary$variant, "DR")
+  expect_equal(fit$summary$d_hat, 1L)
+  expect_equal(fit$fits$DR$d_hat, 1L)
+  expect_true(is.matrix(coef(fit, variant = "DR")))
+  expect_equal(ncol(coef(fit, variant = "DR")), 1L)
+  expect_equal(nrow(scores(fit, variant = "DR")), nrow(d$X))
+
+  target <- targets(fit, variant = "DR")
+  expect_equal(length(target$target_Y), nrow(d$X))
+  expect_equal(dim(target$target_A), dim(d$X))
+})
+
+test_that("csdr supports multiple variants and storage controls", {
+  d <- sample_data(n = 40, seed = 3031)
+
+  fit <- suppressWarnings(
     csdr(
-    Y = d$Y,
-    X = d$X,
-    C = d$C,
-    method = "RA",
-    args_compute_new_response = list(
+      Y = d$Y,
+      A = d$X,
+      C = d$C,
+      variants = c("RA", "DR", "PO", "RP"),
+      d = 1,
       L = 2L,
-      outcome_fitter = fit_linear,
-      seed = 3030
-    )
+      seed = 3031,
+      fitters = list(outcome = fit_linear, C = fit_c_linear),
+      target_control = list(args_gps = list(method_gps = "linear")),
+      keep_mave = FALSE,
+      verbose = FALSE
     )
   )
 
-  expect_type(csdr_out1, "list")
-  expect_equal(names(csdr_out1), c("mave_fit", "mave_dim_obj", "d_hat", "new_data", "metadata"))
-  expect_equal(csdr_out1$metadata$causal_method, "RA")
-  expect_equal(csdr_out1$metadata$n_observations, nrow(d$X))
-  expect_true(is.matrix(csdr_out1$new_data$new_X))
-  expect_equal(nrow(csdr_out1$new_data$new_X), nrow(d$X))
-  expect_true(csdr_out1$metadata$cre_pipeline$L_folds == 2L)
-  expect_equal(
-    csdr_out1$metadata$cre_pipeline$seed,
-    3030L
+  expect_s3_class(fit, "csdr_fit")
+  expect_equal(names(fit$fits), c("RA", "DR", "PO", "RP"))
+  expect_equal(nrow(fit$summary), 4L)
+  expect_equal(fit$summary$variant, c("RA", "DR", "PO", "RP"))
+  expect_true(all(fit$summary$d_hat == 1L))
+  expect_true(all(vapply(coef(fit), is.matrix, logical(1))))
+  expect_equal(dim(scores(fit, variant = "PO")), c(nrow(d$X), 1L))
+  expect_null(fit$fits$DR$mave_fit)
+  expect_null(fit$fits$DR$mave_dim_obj)
+  expect_true(is.matrix(fit$fits$DR$beta))
+  expect_true(is.matrix(fit$fits$DR$score))
+  expect_equal(fit$summary$target_exposure[fit$summary$variant == "RP"], "residualized_A")
+  expect_equal(fit$summary$target_exposure[fit$summary$variant == "DR"], "A")
+})
+
+test_that("csdr targets accessor errors when targets are not retained", {
+  d <- sample_data(n = 40, seed = 3032)
+
+  fit <- suppressWarnings(
+    csdr(
+      Y = d$Y,
+      A = d$X,
+      C = d$C,
+      variants = "RA",
+      d = 1,
+      L = 2L,
+      seed = 3032,
+      fitters = list(outcome = fit_linear),
+      keep_targets = FALSE,
+      verbose = FALSE
+    )
   )
-  expect_equal(csdr_out1$d_hat, csdr_out2$d_hat)
-  expect_equal(csdr_out1$new_data$new_Y, csdr_out2$new_data$new_Y)
+
+  expect_null(fit$fits$RA$target_Y)
+  expect_error(targets(fit, variant = "RA"), "Targets were not retained")
 })
 
 test_that("estimate_ERS RA returns finite numeric vector and is reproducible", {

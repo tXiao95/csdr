@@ -60,10 +60,6 @@ estimate_ERS <- function(Y, X, C, x_eval = NULL,
     if (is.null(orig_C_names) && !is.null(gps_model$C_names)) colnames(C_df) <- gps_model$C_names
   }
 
-  if (estimator == "RA") {
-    warning("Y and X are not used in RA estimation; they are ignored.")
-  }
-
   if (optimize_bw && estimator != "DR") {
     warning("Bandwidth optimization is only theoretically implemented for the DR estimator. optimize_bw set to FALSE.")
     optimize_bw <- FALSE
