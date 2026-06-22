@@ -36,6 +36,7 @@
 #'
 #' @return An S3 object of class `"ers_fit"`.
 #'
+#' @rdname estimate-ers
 #' @export
 estimate_ers <- function(
   Y,
@@ -61,6 +62,11 @@ estimate_ers <- function(
   estimator <- match.arg(estimator)
 
   data <- normalize_ers_inputs(Y = Y, A = A, C = C, a_eval = a_eval)
+  validate_ers_options(
+    L = L,
+    gps_floor = gps_floor,
+    normalize_ipw = normalize_ipw
+  )
   folds <- make_folds(n = length(data$Y), L = L, folds = folds, seed = seed)
   L_eff <- length(unique(folds))
 
@@ -140,6 +146,14 @@ make_folds <- function(n, L, folds = NULL, seed = NULL) {
   }
   n <- as.integer(n)
 
+  if (!is.numeric(L) || length(L) != 1L || is.na(L) || L < 1L) {
+    stop("'L' must be a positive integer.", call. = FALSE)
+  }
+  L <- as.integer(L)
+  if (L > n) {
+    stop("'L' cannot exceed the number of observations.", call. = FALSE)
+  }
+
   if (!is.null(folds)) {
     if (length(folds) != n) {
       stop("'folds' must have length n.", call. = FALSE)
@@ -148,16 +162,12 @@ make_folds <- function(n, L, folds = NULL, seed = NULL) {
       stop("'folds' cannot contain missing values.", call. = FALSE)
     }
     fold_levels <- unique(folds)
+    if (L > 1L && length(fold_levels) < 2L) {
+      stop("'folds' must contain at least two folds when L > 1.", call. = FALSE)
+    }
     return(as.integer(match(folds, fold_levels)))
   }
 
-  if (!is.numeric(L) || length(L) != 1L || is.na(L) || L < 1L) {
-    stop("'L' must be a positive integer.", call. = FALSE)
-  }
-  L <- as.integer(L)
-  if (L > n) {
-    stop("'L' cannot exceed the number of observations.", call. = FALSE)
-  }
   if (L == 1L) {
     return(rep.int(1L, n))
   }
@@ -470,6 +480,21 @@ normalize_ers_inputs <- function(Y, A, C, a_eval) {
   list(Y = Y, A = A_df, C = C_df, a_eval = a_eval_df)
 }
 
+validate_ers_options <- function(L, gps_floor, normalize_ipw) {
+  if (!is.numeric(L) || length(L) != 1L || is.na(L) || L < 1L) {
+    stop("'L' must be a positive integer.", call. = FALSE)
+  }
+  if (!is.numeric(gps_floor) || length(gps_floor) != 1L ||
+      is.na(gps_floor) || !is.finite(gps_floor) || gps_floor <= 0) {
+    stop("'gps_floor' must be a positive finite number.", call. = FALSE)
+  }
+  if (!is.logical(normalize_ipw) || length(normalize_ipw) != 1L ||
+      is.na(normalize_ipw)) {
+    stop("'normalize_ipw' must be TRUE or FALSE.", call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
 normalize_ers_table <- function(x, n, arg, prefix) {
   if (is.null(x)) {
     stop(sprintf("'%s' cannot be NULL.", arg), call. = FALSE)
@@ -567,6 +592,12 @@ resolve_ers_bandwidth <- function(A, h, c_multiplier, require_positive) {
   p <- ncol(A)
   if (is.null(h)) {
     h <- c_multiplier * apply(A, 2, stats::sd) * (nrow(A)^(-0.2))
+    if (any(!is.finite(h) | h <= 0)) {
+      stop(
+        "Default bandwidth is nonpositive or nonfinite; check for zero-variance exposure columns.",
+        call. = FALSE
+      )
+    }
   }
   h <- as.numeric(h)
   if (length(h) == 1L && p > 1L) {
@@ -575,8 +606,8 @@ resolve_ers_bandwidth <- function(A, h, c_multiplier, require_positive) {
   if (length(h) != p) {
     stop("'h' must have length 1 or ncol(A).", call. = FALSE)
   }
-  if (require_positive && any(!is.finite(h) | h <= 0)) {
-    stop("'h' must contain positive finite bandwidths for IPW and DR.", call. = FALSE)
+  if (any(!is.finite(h) | h <= 0)) {
+    stop("'h' must contain positive finite bandwidths.", call. = FALSE)
   }
   h
 }
