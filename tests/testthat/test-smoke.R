@@ -123,7 +123,8 @@ test_that("csdr supports multiple variants and storage controls", {
       seed = 3031,
       learners = csdr_learners(
         outcome = custom_regression(fit_linear, label = "linear outcome"),
-        rp_y = custom_regression(fit_c_linear, label = "linear C regression")
+        rp_y = custom_regression(fit_c_linear, label = "linear C regression"),
+        rp_a = custom_regression(fit_c_linear, label = "linear A regression")
       ),
       keep_mave = FALSE,
       verbose = FALSE
@@ -144,9 +145,10 @@ test_that("csdr supports multiple variants and storage controls", {
   expect_equal(fit$summary$target_exposure[fit$summary$variant == "RP"], "residualized_A")
   expect_equal(fit$summary$target_exposure[fit$summary$variant == "DR"], "A")
   expect_true(fit$learner_summary$used[fit$learner_summary$role == "rp_a"])
-  expect_match(
-    fit$learner_summary$details[fit$learner_summary$role == "rp_a"],
-    "not separately wired"
+  expect_false(any(grepl("not separately wired", fit$learner_summary$details, fixed = TRUE)))
+  expect_equal(
+    fit$learner_summary$label[fit$learner_summary$role == "rp_a"],
+    "linear A regression"
   )
 })
 

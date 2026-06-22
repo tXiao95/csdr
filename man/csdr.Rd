@@ -43,11 +43,13 @@ cross-fitting.}
 
 \item{seed}{Optional random seed used when folds are generated.}
 
-\item{learners}{Learner specifications created by \code{\link[=csdr_learners]{csdr_learners()}}.}
+\item{learners}{Learner specifications created by \code{\link[=csdr_learners]{csdr_learners()}}.
+\code{learners$rp_y} controls \code{E[Y | C]} for RP targets and \code{learners$rp_a}
+controls \code{E[A_j | C]} for RP targets.}
 
 \item{target_control}{Optional named list passed to \code{\link[=csdr_target]{csdr_target()}}. Supported
-entries include \code{folds}, \code{args_outcome}, \code{args_gps}, \code{args_C}, \code{args_ers},
-and \code{po_marginalization}.}
+entries include \code{folds}, \code{args_outcome}, \code{args_gps}, \code{args_rp_y},
+\code{args_rp_a}, \code{args_C}, \code{args_ers}, and \code{po_marginalization}.}
 
 \item{mave_control}{Optional named list of arguments passed to
 \code{\link[MAVE:mave]{MAVE::mave()}}.}

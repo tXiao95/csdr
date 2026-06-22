@@ -13,10 +13,14 @@ csdr_target(
   folds = NULL,
   outcome_fitter = SL_outcome_fitter,
   gps_fitter = mvn_fitter,
-  C_fitter = SL_nuisance_fitter,
+  rp_y_fitter = SL_nuisance_fitter,
+  rp_a_fitter = SL_nuisance_fitter,
+  C_fitter = NULL,
   args_outcome = list(),
   args_gps = list(),
-  args_C = list(),
+  args_rp_y = list(),
+  args_rp_a = list(),
+  args_C = NULL,
   args_ers = list(),
   po_marginalization = c("crossfit", "fold", "all"),
   seed = NULL,
@@ -41,13 +45,25 @@ csdr_target(
 
 \item{gps_fitter}{Function used by \code{\link[=gps_model]{gps_model()}} for DR and PO.}
 
-\item{C_fitter}{Function used by \code{\link[=fit_rp_nuisance]{fit_rp_nuisance()}} for RP.}
+\item{rp_y_fitter}{Function used by \code{\link[=fit_rp_nuisance]{fit_rp_nuisance()}} for \code{E[Y | C]}
+in RP.}
+
+\item{rp_a_fitter}{Function used by \code{\link[=fit_rp_nuisance]{fit_rp_nuisance()}} for \code{E[A_j | C]}
+in RP.}
+
+\item{C_fitter}{Compatibility alias for using one RP fitter for both
+\code{rp_y_fitter} and \code{rp_a_fitter}.}
 
 \item{args_outcome}{Additional arguments passed to \code{outcome_fitter}.}
 
 \item{args_gps}{Additional arguments passed to \code{gps_fitter}.}
 
-\item{args_C}{Additional arguments passed to \code{C_fitter}.}
+\item{args_rp_y}{Additional arguments passed to \code{rp_y_fitter}.}
+
+\item{args_rp_a}{Additional arguments passed to \code{rp_a_fitter}.}
+
+\item{args_C}{Compatibility alias for using one RP argument list for both
+\code{args_rp_y} and \code{args_rp_a}.}
 
 \item{args_ers}{Additional arguments passed to legacy \code{\link[=estimate_ERS]{estimate_ERS()}} for
 RA and DR target construction.}

@@ -11,10 +11,18 @@
 #' @param folds Optional fold assignments.
 #' @param outcome_fitter Function used by [outcome_model()] for RA, DR, and PO.
 #' @param gps_fitter Function used by [gps_model()] for DR and PO.
-#' @param C_fitter Function used by [fit_rp_nuisance()] for RP.
+#' @param rp_y_fitter Function used by [fit_rp_nuisance()] for `E[Y | C]`
+#'   in RP.
+#' @param rp_a_fitter Function used by [fit_rp_nuisance()] for `E[A_j | C]`
+#'   in RP.
+#' @param C_fitter Compatibility alias for using one RP fitter for both
+#'   `rp_y_fitter` and `rp_a_fitter`.
 #' @param args_outcome Additional arguments passed to `outcome_fitter`.
 #' @param args_gps Additional arguments passed to `gps_fitter`.
-#' @param args_C Additional arguments passed to `C_fitter`.
+#' @param args_rp_y Additional arguments passed to `rp_y_fitter`.
+#' @param args_rp_a Additional arguments passed to `rp_a_fitter`.
+#' @param args_C Compatibility alias for using one RP argument list for both
+#'   `args_rp_y` and `args_rp_a`.
 #' @param args_ers Additional arguments passed to legacy [estimate_ERS()] for
 #'   RA and DR target construction.
 #' @param po_marginalization Marginalization mode for PO. See
@@ -35,10 +43,14 @@ csdr_target <- function(
   folds = NULL,
   outcome_fitter = SL_outcome_fitter,
   gps_fitter = mvn_fitter,
-  C_fitter = SL_nuisance_fitter,
+  rp_y_fitter = SL_nuisance_fitter,
+  rp_a_fitter = SL_nuisance_fitter,
+  C_fitter = NULL,
   args_outcome = list(),
   args_gps = list(),
-  args_C = list(),
+  args_rp_y = list(),
+  args_rp_a = list(),
+  args_C = NULL,
   args_ers = list(),
   po_marginalization = c("crossfit", "fold", "all"),
   seed = NULL,
@@ -46,9 +58,30 @@ csdr_target <- function(
   verbose = TRUE
 ) {
   call <- match.call()
+  rp_y_fitter_missing <- missing(rp_y_fitter)
+  rp_a_fitter_missing <- missing(rp_a_fitter)
+  args_rp_y_missing <- missing(args_rp_y)
+  args_rp_a_missing <- missing(args_rp_a)
   valid_methods <- c("RA", "DR", "PO", "RP")
   methods <- match.arg(methods, choices = valid_methods, several.ok = TRUE)
   po_marginalization <- match.arg(po_marginalization)
+
+  if (!is.null(C_fitter)) {
+    if (rp_y_fitter_missing) {
+      rp_y_fitter <- C_fitter
+    }
+    if (rp_a_fitter_missing) {
+      rp_a_fitter <- C_fitter
+    }
+  }
+  if (!is.null(args_C)) {
+    if (args_rp_y_missing || identical(args_rp_y, list())) {
+      args_rp_y <- args_C
+    }
+    if (args_rp_a_missing || identical(args_rp_a, list())) {
+      args_rp_a <- args_C
+    }
+  }
 
   data <- normalize_ers_inputs(Y = Y, A = A, C = C, a_eval = A)
   folds <- make_folds(n = length(data$Y), L = L, folds = folds, seed = seed)
@@ -68,8 +101,11 @@ csdr_target <- function(
   if (needs_gps && !is.function(gps_fitter)) {
     stop("'gps_fitter' must be a function for DR and PO.", call. = FALSE)
   }
-  if (needs_rp && !is.function(C_fitter)) {
-    stop("'C_fitter' must be a function for RP.", call. = FALSE)
+  if (needs_rp && !is.function(rp_y_fitter)) {
+    stop("'rp_y_fitter' must be a function for RP.", call. = FALSE)
+  }
+  if (needs_rp && !is.function(rp_a_fitter)) {
+    stop("'rp_a_fitter' must be a function for RP.", call. = FALSE)
   }
 
   po_gps_floor <- resolve_target_gps_floor(args_ers)
@@ -192,10 +228,10 @@ csdr_target <- function(
         Y = Y_train,
         A = A_train,
         C = C_train,
-        y_fitter = C_fitter,
-        a_fitter = C_fitter,
-        args_y = args_C,
-        args_a = args_C,
+        y_fitter = rp_y_fitter,
+        a_fitter = rp_a_fitter,
+        args_y = args_rp_y,
+        args_a = args_rp_a,
         verbose = FALSE
       )
       nuisance_store$rp_models[[k]] <- rp_mod

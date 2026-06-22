@@ -18,9 +18,11 @@
 #'   cross-fitting.
 #' @param seed Optional random seed used when folds are generated.
 #' @param learners Learner specifications created by [csdr_learners()].
+#'   `learners$rp_y` controls `E[Y | C]` for RP targets and `learners$rp_a`
+#'   controls `E[A_j | C]` for RP targets.
 #' @param target_control Optional named list passed to [csdr_target()]. Supported
-#'   entries include `folds`, `args_outcome`, `args_gps`, `args_C`, `args_ers`,
-#'   and `po_marginalization`.
+#'   entries include `folds`, `args_outcome`, `args_gps`, `args_rp_y`,
+#'   `args_rp_a`, `args_C`, `args_ers`, and `po_marginalization`.
 #' @param mave_control Optional named list of arguments passed to
 #'   [MAVE::mave()].
 #' @param keep_targets Logical; if `TRUE`, keep generated target responses and
@@ -139,10 +141,12 @@ csdr <- function(
     folds = target_control$folds,
     outcome_fitter = learner_args$outcome_fitter,
     gps_fitter = learner_args$gps_fitter,
-    C_fitter = learner_args$C_fitter,
+    rp_y_fitter = learner_args$rp_y_fitter,
+    rp_a_fitter = learner_args$rp_a_fitter,
     args_outcome = learner_args$args_outcome,
     args_gps = learner_args$args_gps,
-    args_C = learner_args$args_C,
+    args_rp_y = learner_args$args_rp_y,
+    args_rp_a = learner_args$args_rp_a,
     args_ers = target_control$args_ers %||% list(),
     po_marginalization = target_control$po_marginalization %||% "crossfit",
     seed = seed,
@@ -351,13 +355,11 @@ coerce_mave_beta <- function(candidate, d_hat, p) {
 }
 
 as_csdr_target_args <- function(learners, target_control) {
-  # TODO: pass rp_y and rp_a separately once RP internals support distinct
-  # C-only learners for Y and A residualization. For now csdr_target() accepts
-  # one shared C_fitter, so rp_y is the canonical learner.
   list(
     outcome_fitter = learners$outcome$fitter,
     gps_fitter = learners$gps$fitter,
-    C_fitter = learners$rp_y$fitter,
+    rp_y_fitter = learners$rp_y$fitter,
+    rp_a_fitter = learners$rp_a$fitter,
     args_outcome = utils::modifyList(
       learners$outcome$args,
       target_control$args_outcome %||% list()
@@ -366,9 +368,13 @@ as_csdr_target_args <- function(learners, target_control) {
       learners$gps$args,
       target_control$args_gps %||% list()
     ),
-    args_C = utils::modifyList(
+    args_rp_y = utils::modifyList(
       learners$rp_y$args,
-      target_control$args_C %||% list()
+      target_control$args_rp_y %||% target_control$args_C %||% list()
+    ),
+    args_rp_a = utils::modifyList(
+      learners$rp_a$args,
+      target_control$args_rp_a %||% target_control$args_C %||% list()
     )
   )
 }
@@ -386,9 +392,6 @@ summarize_csdr_learners <- function(learners, variants) {
     lapply(names(used), function(role) {
       learner <- learners[[role]]
       details <- describe_csdr_learner(learner)
-      if (role == "rp_a") {
-        details <- paste(details, "not separately wired; using rp_y learner", sep = "; ")
-      }
       data.frame(
         role = role,
         used = used[[role]],

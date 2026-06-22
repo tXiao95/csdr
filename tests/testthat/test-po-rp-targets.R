@@ -18,6 +18,18 @@ target_fit_c_linear <- function(target, C_df, ...) {
   lm(target ~ ., data = as.data.frame(C_df))
 }
 
+target_fit_rp_y_marker <- function(target, C_df, ...) {
+  fit <- lm(target ~ ., data = as.data.frame(C_df))
+  class(fit) <- c("lm", "rp_y_marker")
+  fit
+}
+
+target_fit_rp_a_marker <- function(target, C_df, ...) {
+  fit <- lm(target ~ ., data = as.data.frame(C_df))
+  class(fit) <- c("lm", "rp_a_marker")
+  fit
+}
+
 test_that("compute_pseudo_outcomes matches manual arithmetic", {
   Y <- c(2, 3, 5)
   m_obs <- c(1, 2, 4)
@@ -445,6 +457,52 @@ test_that("csdr_target constructs individual method targets", {
   expect_equal(length(fit_rp$new_Y$RP), nrow(d$A))
   expect_equal(dim(fit_rp$new_A$RP), dim(d$A))
   expect_false(isTRUE(all.equal(fit_rp$new_A$RP, d$A)))
+})
+
+test_that("csdr_target wires RP Y and A learners separately", {
+  d <- target_sample_data(n = 36, seed = 62511)
+  folds <- rep(1:2, length.out = nrow(d$A))
+
+  fit <- csdr_target(
+    Y = d$Y,
+    A = d$A,
+    C = d$C,
+    methods = "RP",
+    L = 2,
+    folds = folds,
+    rp_y_fitter = target_fit_rp_y_marker,
+    rp_a_fitter = target_fit_rp_a_marker,
+    return_nuisance = TRUE,
+    verbose = FALSE
+  )
+
+  expect_s3_class(fit, "csdr_target")
+  expect_equal(length(fit$new_Y$RP), nrow(d$A))
+  expect_equal(dim(fit$new_A$RP), dim(d$A))
+  expect_s3_class(fit$nuisance$rp_models[[1]]$Y_model$inner_fit, "rp_y_marker")
+  expect_s3_class(fit$nuisance$rp_models[[1]]$A_models[[1]]$inner_fit, "rp_a_marker")
+})
+
+test_that("csdr_target keeps C_fitter RP compatibility path", {
+  d <- target_sample_data(n = 36, seed = 62512)
+  folds <- rep(1:2, length.out = nrow(d$A))
+
+  fit <- csdr_target(
+    Y = d$Y,
+    A = d$A,
+    C = d$C,
+    methods = "RP",
+    L = 2,
+    folds = folds,
+    C_fitter = target_fit_rp_y_marker,
+    return_nuisance = TRUE,
+    verbose = FALSE
+  )
+
+  expect_equal(length(fit$new_Y$RP), nrow(d$A))
+  expect_equal(dim(fit$new_A$RP), dim(d$A))
+  expect_s3_class(fit$nuisance$rp_models[[1]]$Y_model$inner_fit, "rp_y_marker")
+  expect_s3_class(fit$nuisance$rp_models[[1]]$A_models[[1]]$inner_fit, "rp_y_marker")
 })
 
 test_that("csdr_target constructs all requested targets with shared folds", {
