@@ -65,8 +65,10 @@ in RP.}
 \item{args_C}{Compatibility alias for using one RP argument list for both
 \code{args_rp_y} and \code{args_rp_a}.}
 
-\item{args_ers}{Additional arguments passed to legacy \code{\link[=estimate_ERS]{estimate_ERS()}} for
-RA and DR target construction.}
+\item{args_ers}{Additional arguments passed to ERS target construction for
+RA and DR. Supported entries include \code{h}, \code{c_multiplier}, \code{gps_floor},
+\code{delta_n} as a compatibility alias for \code{gps_floor}, \code{normalize_ipw}, and
+\code{level}.}
 
 \item{po_marginalization}{Marginalization mode for PO. See
 \code{\link[=estimate_pseudo_outcomes]{estimate_pseudo_outcomes()}}.}

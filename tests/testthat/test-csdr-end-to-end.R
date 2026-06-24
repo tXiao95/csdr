@@ -114,3 +114,27 @@ test_that("csdr verbose flag controls learner-choice messages", {
     "CSDR learner choices"
   )
 })
+
+test_that("csdr verbose false does not emit legacy ERS row messages", {
+  d <- end_to_end_data(seed = 5, n = 40)
+
+  quiet_messages <- character()
+  withCallingHandlers(
+    suppressWarnings(csdr(
+      Y = d$Y,
+      A = d$A,
+      C = d$C,
+      variants = "DR",
+      d = 1,
+      L = 2,
+      learners = csdr_learners(sl_library = "SL.glm"),
+      verbose = FALSE
+    )),
+    message = function(m) {
+      quiet_messages <<- c(quiet_messages, conditionMessage(m))
+      invokeRestart("muffleMessage")
+    }
+  )
+
+  expect_false(any(grepl("Evaluating ERS row", quiet_messages, fixed = TRUE)))
+})

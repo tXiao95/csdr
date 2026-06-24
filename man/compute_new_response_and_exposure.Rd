@@ -50,7 +50,8 @@ compute_new_response_and_exposure(
 
 \item{args_gps}{List of additional arguments to pass to gps_fitter (e.g., list(method="linear")).}
 
-\item{args_ers}{List of additional arguments to pass to estimate_ERS (e.g., list(optimize_bw=TRUE)).}
+\item{args_ers}{List of additional arguments for ERS target construction,
+such as \code{h}, \code{c_multiplier}, or \code{gps_floor}.}
 
 \item{po_marginalization}{Marginalization mode for PO targets. Defaults to
 \code{"crossfit"} through \code{\link[=csdr_target]{csdr_target()}}.}

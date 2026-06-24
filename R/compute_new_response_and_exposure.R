@@ -13,7 +13,8 @@
 #' @param args_outcome List of additional arguments to pass to outcome_fitter.
 #' @param args_C List of additional arguments to pass to C_fitter.
 #' @param args_gps List of additional arguments to pass to gps_fitter (e.g., list(method="linear")).
-#' @param args_ers List of additional arguments to pass to estimate_ERS (e.g., list(optimize_bw=TRUE)).
+#' @param args_ers List of additional arguments for ERS target construction,
+#'   such as `h`, `c_multiplier`, or `gps_floor`.
 #' @param po_marginalization Marginalization mode for PO targets. Defaults to
 #'   `"crossfit"` through [csdr_target()].
 #' @param verbose Logical; if `TRUE`, print progress messages.

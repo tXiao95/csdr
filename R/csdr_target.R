@@ -23,8 +23,10 @@
 #' @param args_rp_a Additional arguments passed to `rp_a_fitter`.
 #' @param args_C Compatibility alias for using one RP argument list for both
 #'   `args_rp_y` and `args_rp_a`.
-#' @param args_ers Additional arguments passed to legacy [estimate_ERS()] for
-#'   RA and DR target construction.
+#' @param args_ers Additional arguments passed to ERS target construction for
+#'   RA and DR. Supported entries include `h`, `c_multiplier`, `gps_floor`,
+#'   `delta_n` as a compatibility alias for `gps_floor`, `normalize_ipw`, and
+#'   `level`.
 #' @param po_marginalization Marginalization mode for PO. See
 #'   [estimate_pseudo_outcomes()].
 #' @param seed Optional random seed for fold generation.
@@ -123,7 +125,7 @@ csdr_target <- function(
   )
 
   po_m_obs <- po_pi_obs <- if ("PO" %in% methods) rep(NA_real_, n) else NULL
-  legacy_ers_args <- prepare_legacy_ers_args(args_ers)
+  modular_ers_args <- prepare_modular_ers_args(args_ers)
 
   for (k in seq_len(L_eff)) {
     if (isTRUE(verbose) && L_eff > 1L) {
@@ -162,25 +164,25 @@ csdr_target <- function(
     }
 
     if ("RA" %in% methods) {
-      new_Y[["RA"]][test_idx] <- compute_legacy_ers_target(
+      new_Y[["RA"]][test_idx] <- compute_modular_ers_target(
         Y = Y_test,
         A = A_test,
         C = C_test,
         estimator = "RA",
         out_model = out_mod,
         gps_model = NULL,
-        args_ers = legacy_ers_args
+        args_ers = modular_ers_args
       )
     }
     if ("DR" %in% methods) {
-      new_Y[["DR"]][test_idx] <- compute_legacy_ers_target(
+      new_Y[["DR"]][test_idx] <- compute_modular_ers_target(
         Y = Y_test,
         A = A_test,
         C = C_test,
         estimator = "DR",
         out_model = out_mod,
         gps_model = gps_mod,
-        args_ers = legacy_ers_args
+        args_ers = modular_ers_args
       )
     }
     if ("PO" %in% methods) {
@@ -296,30 +298,79 @@ fit_csdr_target_gps_nuisance <- function(A, C, gps_fitter, args_gps) {
   do.call(gps_model, c(gps_args, args_gps))
 }
 
-compute_legacy_ers_target <- function(Y, A, C, estimator, out_model, gps_model,
-                                      args_ers) {
-  ers_args <- list(
-    Y = Y,
-    X = A,
-    C = C,
+compute_modular_ers_target <- function(Y, A, C, estimator, out_model, gps_model,
+                                       args_ers) {
+  estimator <- match.arg(estimator, choices = c("RA", "DR"))
+  n <- length(Y)
+  nuisance <- list(
     estimator = estimator,
-    out_model = out_model,
-    return_vector = TRUE
+    L = 1L,
+    folds = rep.int(1L, n),
+    outcome_models = list(out_model),
+    gps_models = if (estimator == "DR") list(gps_model) else list(NULL)
   )
-  if (estimator == "DR") {
-    ers_args$gps_model <- gps_model
-  }
-  as.numeric(do.call(estimate_ERS, c(ers_args, args_ers)))
+  class(nuisance) <- "ers_nuisance_fit"
+
+  nuisance_pred <- predict_ers_nuisance(
+    nuisance = nuisance,
+    Y = Y,
+    A = A,
+    C = C,
+    a_eval = A,
+    estimator = estimator,
+    gps_floor = args_ers$gps_floor,
+    verbose = FALSE
+  )
+
+  compute_args <- c(
+    list(
+      Y = Y,
+      A = A,
+      a_eval = A,
+      estimator = estimator,
+      m_eval = nuisance_pred$m_eval,
+      pi_obs = nuisance_pred$pi_obs
+    ),
+    args_ers
+  )
+  ers <- do.call(compute_ers, compute_args)
+  as.numeric(ers$results$estimate)
 }
 
-prepare_legacy_ers_args <- function(args_ers) {
+prepare_modular_ers_args <- function(args_ers) {
   out <- args_ers
   if (!is.null(out$gps_floor) && is.null(out$delta_n)) {
     out$delta_n <- out$gps_floor
   }
-  out$gps_floor <- NULL
+  if (!is.null(out$delta_n) && is.null(out$gps_floor)) {
+    out$gps_floor <- out$delta_n
+  }
+  out$delta_n <- NULL
   out$po_marginalization <- NULL
   out$marginalization <- NULL
+  if (isTRUE(out$optimize_bw)) {
+    warning(
+      "'optimize_bw' is not implemented in modular ERS target construction and is ignored.",
+      call. = FALSE
+    )
+  }
+  out$optimize_bw <- NULL
+  out$return_vector <- NULL
+  supported <- c("h", "c_multiplier", "gps_floor", "normalize_ipw", "level")
+  unsupported <- setdiff(names(out), supported)
+  if (length(unsupported) > 0L) {
+    stop(
+      "Unsupported entries in 'args_ers': ",
+      paste(unsupported, collapse = ", "),
+      call. = FALSE
+    )
+  }
+  if (is.null(out$gps_floor)) {
+    out$gps_floor <- 1e-8
+  }
+  if (is.null(out$normalize_ipw)) {
+    out$normalize_ipw <- TRUE
+  }
   out
 }
 
