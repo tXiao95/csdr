@@ -3,9 +3,17 @@
 \docType{package}
 \name{csdr-package}
 \alias{csdr-package}
-\title{csdr: Causal Sufficient Dimension Reduction}
+\title{Causal sufficient dimension reduction}
 \description{
-Implements methods for causal sufficient dimension reduction with multiple continuous exposures. The package estimates low-dimensional exposure summaries that preserve the causal exposure-response surface, with tools for estimating the causal central mean subspace, selecting the structural dimension, computing subspace importance scores, and estimating the reduced exposure-response surface.
+The package entry point is \code{\link[=csdr]{csdr()}}, which constructs causal SDR targets and
+fits MAVE for one or more variants. Advanced users can call \code{\link[=csdr_target]{csdr_target()}}
+for target construction only, \code{\link[=estimate_ers]{estimate_ers()}} for exposure-response surface
+estimation, \code{\link[=estimate_pseudo_outcomes]{estimate_pseudo_outcomes()}} for pseudo-outcome construction,
+and \code{\link[=estimate_residualized_pair]{estimate_residualized_pair()}} for residualized-pair construction.
+}
+\details{
+Learners are specified with \code{\link[=csdr_learners]{csdr_learners()}}, \code{\link[=sl_regression]{sl_regression()}},
+\code{\link[=mvn_gps]{mvn_gps()}}, \code{\link[=custom_regression]{custom_regression()}}, and \code{\link[=custom_gps]{custom_gps()}}.
 }
 \author{
 \strong{Maintainer}: Thomas Hsiao \email{thomas.hsiao@emory.edu} (\href{https://orcid.org/0009-0005-7848-7992}{ORCID})
