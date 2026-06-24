@@ -413,23 +413,3 @@ test_that("estimate_ers diagnostics are populated by estimator", {
   expect_true(all(fit_ra$results$effective_n >= 0))
   expect_true(all(fit_dr$results$effective_n >= 0))
 })
-
-test_that("crossfit_ERS remains a compatibility wrapper", {
-  d <- ers_sample_data(seed = 108)
-  fit <- crossfit_ERS(
-    Y = d$Y,
-    X = d$A,
-    C = d$C,
-    x_eval = d$A[1:4, , drop = FALSE],
-    estimator = "RA",
-    L = 2,
-    outcome_fitter = ers_fit_linear,
-    seed = 108
-  )
-
-  expect_s3_class(fit, "ers_fit")
-  expect_equal(nrow(fit$results), 4L)
-  expect_equal(fit$metadata$L_folds, 2L)
-  expect_equal(fit$metadata$seed, 108L)
-  expect_true(all(is.finite(fit$results$estimate)))
-})

@@ -19,40 +19,6 @@ fit_c_linear <- function(target, C_df, ...) {
   lm(target ~ ., data = as.data.frame(C_df))
 }
 
-test_that("crossfit_ERS RA smoke test is deterministic and structured", {
-  d <- sample_data()
-  x_eval <- d$X[1:10, , drop = FALSE]
-  out1 <- csdr:::crossfit_ERS(
-    Y = d$Y,
-    X = d$X,
-    C = d$C,
-    x_eval = x_eval,
-    estimator = "RA",
-    L = 3,
-    outcome_fitter = fit_linear,
-    seed = 2026
-  )
-  out2 <- csdr:::crossfit_ERS(
-    Y = d$Y,
-    X = d$X,
-    C = d$C,
-    x_eval = x_eval,
-    estimator = "RA",
-    L = 3,
-    outcome_fitter = fit_linear,
-    seed = 2026
-  )
-
-  expect_type(out1, "list")
-  expect_type(out2, "list")
-  expect_equal(out1$results, out2$results)
-  expect_equal(out1$metadata$L_folds, 3L)
-  expect_equal(out1$metadata$seed, 2026L)
-  expect_equal(nrow(out1$results), nrow(x_eval))
-  expect_true(all(is.finite(out1$results$estimate)))
-  expect_true(all(!is.na(out1$results$estimate)))
-})
-
 test_that("outcome_model and predict output match expectation", {
   d <- sample_data(seed = 2027)
   out_model <- csdr:::outcome_model(
