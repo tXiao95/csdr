@@ -75,7 +75,8 @@ predict.nuisance_C_model <- function(object, newdata, ...) {
   return(as.numeric(preds))
 }
 
-# Backward-compatible wrapper for C-only SuperLearner nuisance regressions.
+# Compatibility alias for older internal/default code paths. New learner specs
+# should point at sl_regression_fitter() through sl_regression().
 SL_nuisance_fitter <- function(target,
                                C_df,
                                SL.library = csdr_default_sl_library(),

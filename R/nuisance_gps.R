@@ -141,7 +141,8 @@ mvn_gps_fitter <- function(A = NULL, C, X = NULL,
   return(res)
 }
 
-# Backward-compatible MVN GPS fitter name.
+# Compatibility alias for older internal/default code paths. New learner specs
+# should point at mvn_gps_fitter() through mvn_gps().
 mvn_fitter <- function(X, C, method_gps = c("linear", "SuperLearner"), ...) {
   mvn_gps_fitter(A = X, C = C, method_gps = method_gps, ...)
 }

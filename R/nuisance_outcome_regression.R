@@ -115,7 +115,8 @@ sl_regression_fitter <- function(Y,
   )
 }
 
-# Backward-compatible wrapper.
+# Compatibility alias for older internal/default code paths. New learner specs
+# should point at sl_regression_fitter() through sl_regression().
 SL_outcome_fitter <- function(Y,
                               XC_df,
                               SL.library = csdr_default_sl_library(),
