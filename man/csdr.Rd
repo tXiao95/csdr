@@ -89,6 +89,12 @@ exposure on the covariates.
 \code{"DR"} is the default. \code{"PO"} is generally the most computationally
 intensive because of its marginalization step. See \code{\link[=csdr_target]{csdr_target()}} for the
 lower-level target-construction interface.
+
+Validation failures have class \code{"csdr_validation_error"}. Failures during
+nuisance fitting, target construction, MAVE fitting, or dimension selection
+have class \code{"csdr_fit_error"} and retain the original condition in \code{parent}.
+Structured fields identify the \code{stage} and, when available, the \code{variant},
+\code{fold}, and learner \code{role}.
 }
 \examples{
 \dontrun{
