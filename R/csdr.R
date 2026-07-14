@@ -274,8 +274,10 @@ fit_csdr_variant <- function(variant, target_Y, target_A, d, max_dim,
   }
 
   beta <- extract_mave_beta(mave_fit, d_hat = d_hat)
+  rownames(beta) <- colnames(target_A)
   score <- target_A %*% beta
   colnames(score) <- paste0("score", seq_len(ncol(score)))
+  rownames(score) <- rownames(target_A)
 
   list(
     variant = variant,
@@ -664,8 +666,18 @@ print.csdr_fit <- function(x, ...) {
   cat("Causal sufficient dimension reduction fit\n")
   cat("Variants:", paste(x$variants, collapse = ", "), "\n")
   cat("Observations:", x$input$n, "\n")
-  cat("Exposures:", x$input$p, "\n")
-  cat("Folds:", x$control$L, "\n\n")
+  cat("Exposures:", x$input$p, sprintf("(%s)", paste(x$input$A_names, collapse = ", ")), "\n")
+  cat("Folds:", x$target$diagnostics$L, "\n")
+  cat(
+    "Retained:",
+    sprintf(
+      "targets=%s, MAVE=%s, nuisance=%s",
+      yes_no(x$control$keep_targets),
+      yes_no(x$control$keep_mave),
+      yes_no(x$control$keep_nuisance)
+    ),
+    "\n\n"
+  )
   print(x$summary, row.names = FALSE)
   invisible(x)
 }
@@ -687,7 +699,18 @@ summary.csdr_fit <- function(object, ...) {
 print.summary.csdr_fit <- function(x, ...) {
   cat("Summary of causal sufficient dimension reduction fit\n\n")
   print(x$summary, row.names = FALSE)
+  cat("\nLearners:\n")
+  learner_table <- x$learner_summary[x$learner_summary$used,
+                                     c("role", "label", "details"), drop = FALSE]
+  print(learner_table, row.names = FALSE)
+  cat("\nTarget construction:\n")
+  cat("Effective folds:", x$target_diagnostics$L, "\n")
+  cat("PO marginalization:", x$target_diagnostics$po_marginalization, "\n")
   invisible(x)
+}
+
+yes_no <- function(x) {
+  if (isTRUE(x)) "yes" else "no"
 }
 
 #' @export
@@ -739,6 +762,111 @@ targets.csdr_fit <- function(object, variant = NULL, ...) {
     list(target_Y = fit$target_Y, target_A = fit$target_A)
   })
   if (length(out) == 1L) out[[1L]] else out
+}
+
+#' Extract retained MAVE objects
+#'
+#' Return the original MAVE fit and dimension-selection object retained for each
+#' selected CSDR variant. If a structural dimension was supplied directly to
+#' [csdr()], `dimension_selection` is `NULL` because [MAVE::mave.dim()] was not
+#' run.
+#'
+#' @param object A fitted object.
+#' @param ... Additional arguments passed to methods.
+#'
+#' @export
+mave_fits <- function(object, ...) {
+  UseMethod("mave_fits")
+}
+
+#' @param variant Optional variant name. If `NULL`, return all variants.
+#' @rdname mave_fits
+#' @export
+mave_fits.csdr_fit <- function(object, variant = NULL, ...) {
+  if (!isTRUE(object$control$keep_mave)) {
+    stop("MAVE objects were not retained. Refit with 'keep_mave = TRUE'.",
+         call. = FALSE)
+  }
+  selected <- select_csdr_variants(object, variant)
+  out <- lapply(selected, function(v) {
+    list(
+      fit = object$fits[[v]]$mave_fit,
+      dimension_selection = object$fits[[v]]$mave_dim_obj
+    )
+  })
+  names(out) <- selected
+  if (length(out) == 1L) out[[1L]] else out
+}
+
+#' Extract retained nuisance fits
+#'
+#' Return the original fold-level nuisance objects retained by [csdr()]. The
+#' available roles depend on the fitted variants: `"outcome"` for RA, DR, and
+#' PO; `"gps"` for DR and PO; `"po"` for PO; and `"rp"` for RP.
+#'
+#' @param object A fitted object.
+#' @param role Optional nuisance role: `"outcome"`, `"gps"`, `"po"`, or
+#'   `"rp"`. If `NULL`, return all roles used by the fit.
+#' @param fold Optional positive integer selecting one retained fold.
+#' @param ... Additional arguments passed to methods.
+#'
+#' @export
+nuisance_fits <- function(object, ...) {
+  UseMethod("nuisance_fits")
+}
+
+#' @rdname nuisance_fits
+#' @export
+nuisance_fits.csdr_fit <- function(object, role = NULL, fold = NULL, ...) {
+  if (!isTRUE(object$control$keep_nuisance) || is.null(object$target$nuisance)) {
+    stop("Nuisance objects were not retained. Refit with 'keep_nuisance = TRUE'.",
+         call. = FALSE)
+  }
+
+  role_fields <- c(
+    outcome = "outcome_models",
+    gps = "gps_models",
+    po = "po_models",
+    rp = "rp_models"
+  )
+  available <- names(role_fields)[vapply(role_fields, function(field) {
+    !is.null(object$target$nuisance[[field]])
+  }, logical(1))]
+
+  all_roles <- is.null(role)
+  if (all_roles) {
+    selected_roles <- available
+  } else {
+    if (!is.character(role) || length(role) != 1L || is.na(role)) {
+      stop("'role' must be one of 'outcome', 'gps', 'po', or 'rp'.", call. = FALSE)
+    }
+    role <- match.arg(role, choices = names(role_fields))
+    if (!role %in% available) {
+      stop(sprintf("Nuisance role '%s' was not used by the fitted variants.", role),
+           call. = FALSE)
+    }
+    selected_roles <- role
+  }
+
+  if (!is.null(fold) &&
+      (!is.numeric(fold) || length(fold) != 1L || is.na(fold) ||
+       fold < 1L || fold != as.integer(fold))) {
+    stop("'fold' must be a positive integer when supplied.", call. = FALSE)
+  }
+
+  out <- lapply(selected_roles, function(selected_role) {
+    fits <- object$target$nuisance[[role_fields[[selected_role]]]]
+    if (!is.null(fold)) {
+      if (fold > length(fits)) {
+        stop(sprintf("'fold' cannot exceed the number of retained folds (%d).",
+                     length(fits)), call. = FALSE)
+      }
+      fits <- fits[as.integer(fold)]
+    }
+    fits
+  })
+  names(out) <- selected_roles
+  if (!all_roles) out[[1L]] else out
 }
 
 select_csdr_variants <- function(object, variant) {

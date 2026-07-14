@@ -118,10 +118,10 @@ csdr_target <- function(
   names(new_A) <- methods
 
   nuisance_store <- list(
-    outcome_models = if (needs_outcome) vector("list", L_eff) else NULL,
-    gps_models = if (needs_gps) vector("list", L_eff) else NULL,
-    po_models = if ("PO" %in% methods) vector("list", L_eff) else NULL,
-    rp_models = if (needs_rp) vector("list", L_eff) else NULL
+    outcome_models = if (needs_outcome) named_fold_list(L_eff) else NULL,
+    gps_models = if (needs_gps) named_fold_list(L_eff) else NULL,
+    po_models = if ("PO" %in% methods) named_fold_list(L_eff) else NULL,
+    rp_models = if (needs_rp) named_fold_list(L_eff) else NULL
   )
 
   po_m_obs <- po_pi_obs <- if ("PO" %in% methods) rep(NA_real_, n) else NULL
@@ -286,6 +286,10 @@ csdr_target <- function(
   )
   class(out) <- "csdr_target"
   out
+}
+
+named_fold_list <- function(L) {
+  stats::setNames(vector("list", L), paste0("fold", seq_len(L)))
 }
 
 fit_csdr_target_outcome_nuisance <- function(Y, A, C, outcome_fitter, args_outcome) {
