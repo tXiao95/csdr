@@ -7,23 +7,28 @@ multivariate exposures. The main user-facing entry point is `csdr()`.
 
 ```r
 # install.packages("remotes")
-remotes::install_github("tXiao95/csdr", ref = "refactor/package-cleanup")
+remotes::install_github("tXiao95/csdr")
 library(csdr)
 ```
 
 ## Quick Start
 
-Prepare an outcome vector `Y`, an exposure matrix or data frame `A`, and a
-covariate matrix or data frame `C`.
+The package includes a small example dataset containing an outcome vector `Y`,
+an exposure matrix `A`, and a covariate matrix `C`.
 
 ```r
+data(csdr_example)
+
 fit <- csdr(
-  Y = Y,
-  A = A,
-  C = C,
+  Y = csdr_example$Y,
+  A = csdr_example$A,
+  C = csdr_example$C,
   variants = "DR",
+  d = 1,
   L = 5,
-  seed = 1
+  seed = 1,
+  learners = csdr_learners(sl_library = "SL.glm"),
+  verbose = FALSE
 )
 
 fit
@@ -38,6 +43,24 @@ beta_hat <- coef(fit, variant = "DR")
 Z_hat <- scores(fit, variant = "DR")
 target_data <- targets(fit, variant = "DR")
 ```
+
+The quick start uses `SL.glm`, which is included with SuperLearner and keeps the
+example lightweight. The default SuperLearner library can also use `glmnet`,
+`xgboost`, and `earth` when those optional packages are installed.
+
+## Which Variant Should I Use?
+
+| Variant | Nuisance models | Main modeling reliance | Relative cost |
+|---|---|---|---|
+| `RA` | Outcome regression | Correct outcome regression | Low |
+| `DR` | Outcome regression and GPS | Either nuisance component provides robustness under the method's assumptions | Medium |
+| `PO` | Outcome regression and GPS | Pseudo-outcome construction and marginalization | High |
+| `RP` | `E[Y \| C]` and each `E[A_j \| C]` | Residualization models | Medium |
+
+`DR` is the package default and a reasonable starting point when both the
+outcome regression and generalized propensity score can be estimated. Use the
+other variants when their assumptions or target construction better match the
+analysis. See `?csdr` and `?csdr_target` for parameter-level details.
 
 ## Multiple Target Variants
 
