@@ -199,3 +199,23 @@ fit_custom <- csdr(
 Custom GPS learners should follow the contract `fitter(A, C, ...)` and return a
 fitted density object whose `predict(object, newdata = ...)` method returns
 numeric conditional density estimates.
+
+## Troubleshooting
+
+- **Input errors before fitting:** Check the argument and column names reported
+  by the error. `Y`, `A`, and `C` must be finite numeric data with compatible
+  rows; `A` and `C` need unique, nonoverlapping names and nonconstant columns.
+- **Nuisance failure in a fold:** The error reports the learner role and fold.
+  Start with `SL.glm`, verify the role-specific learner contract, and inspect
+  sparse or constant training-fold inputs.
+- **MAVE fitting failure:** Inspect the generated target with `targets()` and
+  review `mave_control`. If automatic dimension selection fails, consider a
+  scientifically justified explicit `d`.
+- **Raw object unavailable:** Refit with `keep_mave = TRUE` or
+  `keep_nuisance = TRUE`, as identified by the accessor error. Retaining
+  nuisance fits can substantially increase saved-object size.
+
+Package errors have structured classes. Validation errors inherit from
+`csdr_validation_error`; fitting errors inherit from `csdr_fit_error` and retain
+the original error in `condition$parent`. When available, `stage`, `variant`,
+`fold`, and `role` identify where the failure occurred.
