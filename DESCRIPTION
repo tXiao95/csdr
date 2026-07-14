@@ -15,7 +15,13 @@ Description: Implements methods for causal sufficient dimension reduction with
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.1
 Imports: 
+    MAVE,
+    mvtnorm,
     data.table,
     SuperLearner
+Suggests:
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+Config/roxygen2/version: 8.0.0
+RoxygenNote: 7.3.2

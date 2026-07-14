@@ -6,6 +6,13 @@
 \usage{
 \method{predict}{outcome_model}(object, newdata, ...)
 }
+\arguments{
+\item{object}{An object of class "outcome_model".}
+
+\item{newdata}{A data frame containing the predictors.}
+
+\item{...}{Additional arguments passed to the inner predict method.}
+}
 \description{
 Predict Method for Outcome Model
 }

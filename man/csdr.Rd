@@ -6,44 +6,115 @@
 \usage{
 csdr(
   Y,
-  X,
+  A,
   C,
-  method = c("DR"),
-  args_compute_new_response = list(),
-  args_outcome = list(),
-  args_C = list(),
-  args_gps = list(),
-  args_ers = list(),
-  args_MAVE = list()
+  variants = "DR",
+  d = NULL,
+  max_dim = NULL,
+  L = 5,
+  seed = NULL,
+  learners = csdr_learners(),
+  target_control = list(),
+  mave_control = list(),
+  keep_targets = TRUE,
+  keep_mave = TRUE,
+  keep_nuisance = FALSE,
+  verbose = TRUE
 )
 }
 \arguments{
-\item{Y}{Numeric vector of outcomes (length n).}
+\item{Y}{Numeric outcome vector of length \code{n}.}
 
-\item{X}{Numeric matrix or data frame of observed treatments (n x p).}
+\item{A}{Numeric matrix or data frame of observed continuous exposures.}
 
-\item{C}{Numeric matrix or data frame of observed confounders (n x q).}
+\item{C}{Numeric matrix or data frame of observed covariates.}
 
-\item{method}{String or vector indicating which causal transformation(s) to use ("RA", "DR", "PO", "RP").}
+\item{variants}{Target variants to fit. One or more of \code{"DR"}, \code{"RA"},
+\code{"PO"}, and \code{"RP"}.}
 
-\item{args_compute_new_response}{List of top-level arguments for \code{compute_new_response_and_exposure}
-(e.g., list(L = 10, outcome_fitter = SL_outcome_fitter, seed = 123)).}
+\item{d}{Optional structural dimension. If \code{NULL}, \code{\link[MAVE:mave.dim]{MAVE::mave.dim()}} is
+used to select the dimension for each variant.}
 
-\item{args_outcome}{List of tuning parameters for the outcome fitter.}
+\item{max_dim}{Optional maximum dimension passed to \code{\link[MAVE:mave.dim]{MAVE::mave.dim()}}.
+Defaults to the number of exposure columns for each target.}
 
-\item{args_C}{List of tuning parameters for the C fitter.}
+\item{L}{Number of folds for target construction. \code{L = 1} disables
+cross-fitting.}
 
-\item{args_gps}{List of tuning parameters for the GPS fitter.}
+\item{seed}{Optional random seed used when folds are generated.}
 
-\item{args_ers}{List of tuning parameters for the ERS estimation.}
+\item{learners}{Learner specifications created by \code{\link[=csdr_learners]{csdr_learners()}}.
+\code{learners$rp_y} controls \code{E[Y | C]} for RP targets and \code{learners$rp_a}
+controls \code{E[A_j | C]} for RP targets.}
 
-\item{args_MAVE}{List of arguments to pass to \code{MAVE::mave} (e.g., list(method = "meanOPG")).}
+\item{target_control}{Optional named list passed to \code{\link[=csdr_target]{csdr_target()}}. Supported
+entries include \code{folds}, \code{args_outcome}, \code{args_gps}, \code{args_rp_y},
+\code{args_rp_a}, \code{args_C}, \code{args_ers}, and \code{po_marginalization}.}
+
+\item{mave_control}{Optional named list of arguments passed to
+\code{\link[MAVE:mave]{MAVE::mave()}}.}
+
+\item{keep_targets}{Logical; if \code{TRUE}, keep generated target responses and
+exposures in each variant fit.}
+
+\item{keep_mave}{Logical; if \code{TRUE}, keep raw MAVE fit and dimension-selection
+objects.}
+
+\item{keep_nuisance}{Logical; if \code{TRUE}, keep fitted nuisance objects inside
+the returned target object.}
+
+\item{verbose}{Logical; if \code{TRUE}, print progress messages.}
 }
 \value{
-A list containing the MAVE fit, dimension estimation object, selected dimension,
-the generated pseudo-data, and run metadata. If multiple methods are requested,
-returns a named list of such objects.
+An S3 object of class \code{"csdr_fit"}.
 }
 \description{
-Causal Sufficient Dimension Reduction
+\code{csdr()} is the primary user-facing function for estimating a causal
+sufficient dimension reduction basis. It first constructs generated
+response/exposure targets with \code{\link[=csdr_target]{csdr_target()}}, then fits MAVE separately for
+each requested target variant.
+}
+\examples{
+\dontrun{
+fit <- csdr(Y, A, C)
+fit_all <- csdr(Y, A, C, variants = c("RA", "DR", "PO", "RP"))
+
+fit_glm <- csdr(
+  Y, A, C,
+  learners = csdr_learners(sl_library = c("SL.glm", "SL.ranger", "SL.xgboost"))
+)
+
+fit_outcome <- csdr(
+  Y, A, C,
+  learners = csdr_learners(
+    outcome = sl_regression(SL.library = c("SL.glm", "SL.ranger"))
+  )
+)
+
+fit_gps <- csdr(
+  Y, A, C,
+  learners = csdr_learners(
+    gps = mvn_gps(method = "SuperLearner", SL.library = c("SL.glm", "SL.ranger"))
+  )
+)
+
+my_fitter <- function(Y, W, ...) {
+  fit <- stats::lm(Y ~ ., data = data.frame(Y = Y, W))
+  structure(list(fit = fit), class = "my_regression")
+}
+predict.my_regression <- function(object, newdata, ...) {
+  as.numeric(stats::predict(object$fit, newdata = as.data.frame(newdata)))
+}
+fit_custom <- csdr(
+  Y, A, C,
+  learners = csdr_learners(
+    outcome = custom_regression(my_fitter, label = "custom lm")
+  )
+)
+
+# Custom GPS learners should return fitted density objects whose predict()
+# method returns numeric conditional density estimates.
+coef(fit, variant = "DR")
+}
+
 }

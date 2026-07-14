@@ -1,8 +1,9 @@
-#' Fit a Marginal Nuisance Regression Object E[Target | C]
+#' Fit a Marginal Nuisance Regression Object E(Target | C)
 #'
 #' @param target Numeric vector of the target variable (can be Y or a specific X dimension).
 #' @param C Numeric matrix or data frame of observed confounders.
 #' @param fitter Function(target, C_df) that trains and returns a model.
+#' @param ... Additional arguments passed to the fitter.
 #' @return An S3 object of class "nuisance_C_model".
 
 nuisance_C_model <- function(target, C, fitter, ...) {
@@ -38,7 +39,10 @@ nuisance_C_model <- function(target, C, fitter, ...) {
 #' @param object An object of class "nuisance_C_model".
 #' @param newdata A data frame containing the confounders (C).
 #' @param ... Additional arguments passed to the underlying predict method.
+#'
 #' @return A numeric vector of predictions.
+#'
+#' @exportS3Method stats::predict
 
 predict.nuisance_C_model <- function(object, newdata, ...) {
 
@@ -61,7 +65,7 @@ predict.nuisance_C_model <- function(object, newdata, ...) {
   newdata <- newdata[, req_cols, drop = FALSE]
 
   # Predict using the inner model
-  preds <- predict(object$inner_fit, newdata = newdata, ...)
+  preds <- stats::predict(object$inner_fit, newdata = newdata, ...)
 
   # Extract numeric vector (SuperLearner returns a list with a $pred matrix)
   if (is.list(preds) && "pred" %in% names(preds)) {
@@ -71,7 +75,22 @@ predict.nuisance_C_model <- function(object, newdata, ...) {
   return(as.numeric(preds))
 }
 
-# Define the wrapper for SuperLearner
-SL_nuisance_fitter <- function(target, C_df, SL.lib = c("SL.glm", "SL.glmnet", "SL.xgboost", "SL.earth"), ...) {
-  SuperLearner::SuperLearner(Y = target, X = C_df, family = gaussian(), SL.lib = SL.lib, ...)
+# Compatibility alias for older internal/default code paths. New learner specs
+# should point at sl_regression_fitter() through sl_regression().
+SL_nuisance_fitter <- function(target,
+                               C_df,
+                               SL.library = csdr_default_sl_library(),
+                               family = stats::gaussian(),
+                               SL.lib = NULL,
+                               env = NULL,
+                               ...) {
+  sl_regression_fitter(
+    Y = target,
+    W = C_df,
+    SL.library = SL.library,
+    family = family,
+    SL.lib = SL.lib,
+    env = env,
+    ...
+  )
 }

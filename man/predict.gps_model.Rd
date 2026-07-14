@@ -6,6 +6,13 @@
 \usage{
 \method{predict}{gps_model}(object, newdata, ...)
 }
+\arguments{
+\item{object}{An object of class "gps_model".}
+
+\item{newdata}{A data frame containing predictors for the nuisance models.}
+
+\item{...}{Additional arguments passed to the inner predict method.}
+}
 \description{
 Predict Method for GPS Model
 }

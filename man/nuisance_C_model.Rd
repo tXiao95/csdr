@@ -2,7 +2,7 @@
 % Please edit documentation in R/nuisance_outcome_C.R
 \name{nuisance_C_model}
 \alias{nuisance_C_model}
-\title{Fit a Marginal Nuisance Regression Object E\link{Target | C}}
+\title{Fit a Marginal Nuisance Regression Object E(Target | C)}
 \usage{
 nuisance_C_model(target, C, fitter, ...)
 }
@@ -12,10 +12,12 @@ nuisance_C_model(target, C, fitter, ...)
 \item{C}{Numeric matrix or data frame of observed confounders.}
 
 \item{fitter}{Function(target, C_df) that trains and returns a model.}
+
+\item{...}{Additional arguments passed to the fitter.}
 }
 \value{
 An S3 object of class "nuisance_C_model".
 }
 \description{
-Fit a Marginal Nuisance Regression Object E\link{Target | C}
+Fit a Marginal Nuisance Regression Object E(Target | C)
 }
