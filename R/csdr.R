@@ -117,6 +117,8 @@ csdr <- function(
 
   validate_csdr_options(
     Y = Y,
+    A = A,
+    C = C,
     d = d,
     max_dim = max_dim,
     L = L,
@@ -465,14 +467,18 @@ announce_csdr_learners <- function(learner_summary) {
   invisible(learner_summary)
 }
 
-validate_csdr_options <- function(Y, d, max_dim, L, learners, target_control,
+validate_csdr_options <- function(Y, A, C, d, max_dim, L, learners, target_control,
                                   mave_control, keep_targets, keep_mave,
                                   keep_nuisance, verbose) {
-  if (!is.numeric(Y) || length(Y) < 1L || anyNA(Y)) {
-    stop("'Y' must be a non-missing numeric vector.", call. = FALSE)
-  }
-  if (!is.numeric(L) || length(L) != 1L || is.na(L) || L < 1L) {
+  validate_csdr_data(Y = Y, A = A, C = C)
+  n <- length(Y)
+  if (!is.numeric(L) || length(L) != 1L || is.na(L) || !is.finite(L) ||
+      L < 1L || L != as.integer(L)) {
     stop("'L' must be a positive integer.", call. = FALSE)
+  }
+  if (L > n) {
+    stop(sprintf("'L' (%d) cannot exceed the number of observations (%d).", L, n),
+         call. = FALSE)
   }
   if (!is.null(d) &&
       (!is.numeric(d) || length(d) != 1L || is.na(d) || d < 1L || d != as.integer(d))) {
@@ -492,11 +498,158 @@ validate_csdr_options <- function(Y, d, max_dim, L, learners, target_control,
   if (!is.list(mave_control)) {
     stop("'mave_control' must be a list.", call. = FALSE)
   }
+  validate_control_names(
+    target_control,
+    valid = c(
+      "folds", "args_outcome", "args_gps", "args_rp_y", "args_rp_a",
+      "args_C", "args_ers", "po_marginalization"
+    ),
+    arg = "target_control"
+  )
+  reserved_mave <- intersect(names(mave_control), c("formula", "data"))
+  if (length(reserved_mave) > 0L) {
+    stop(
+      sprintf(
+        "'mave_control' cannot override internally managed argument%s: %s.",
+        if (length(reserved_mave) == 1L) "" else "s",
+        paste(reserved_mave, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+  mave_names <- setdiff(names(formals(MAVE::mave)), c("formula", "data"))
+  validate_control_names(mave_control, valid = mave_names, arg = "mave_control")
   for (arg in c("keep_targets", "keep_mave", "keep_nuisance", "verbose")) {
     value <- get(arg)
     if (!is.logical(value) || length(value) != 1L || is.na(value)) {
       stop(sprintf("'%s' must be TRUE or FALSE.", arg), call. = FALSE)
     }
+  }
+  invisible(TRUE)
+}
+
+validate_csdr_data <- function(Y, A, C) {
+  if (!is.numeric(Y) || !is.null(dim(Y)) || length(Y) < 1L ||
+      any(!is.finite(Y))) {
+    stop("'Y' must be a non-missing finite numeric vector.", call. = FALSE)
+  }
+  validate_csdr_table(A, n = length(Y), arg = "A")
+  validate_csdr_table(C, n = length(Y), arg = "C")
+
+  overlap <- intersect(colnames(A), colnames(C))
+  if (length(overlap) > 0L) {
+    stop(
+      sprintf(
+        "'A' and 'C' must have distinct column names; duplicated across inputs: %s.",
+        paste(overlap, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+  invisible(TRUE)
+}
+
+validate_csdr_table <- function(x, n, arg) {
+  if (!(is.matrix(x) || is.data.frame(x))) {
+    stop(sprintf("'%s' must be a numeric matrix or data frame.", arg), call. = FALSE)
+  }
+  if (nrow(x) != n) {
+    stop(
+      sprintf("'%s' must have %d rows to match 'Y'; received %d.", arg, n, nrow(x)),
+      call. = FALSE
+    )
+  }
+  if (ncol(x) < 1L) {
+    stop(sprintf("'%s' must have at least one column.", arg), call. = FALSE)
+  }
+
+  numeric_columns <- vapply(as.data.frame(x), is.numeric, logical(1))
+  if (!all(numeric_columns)) {
+    stop(
+      sprintf(
+        "'%s' contains nonnumeric column%s: %s.",
+        arg,
+        if (sum(!numeric_columns) == 1L) "" else "s",
+        paste(names(numeric_columns)[!numeric_columns], collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+
+  column_names <- colnames(x)
+  if (is.null(column_names) || anyNA(column_names) || any(!nzchar(column_names))) {
+    stop(sprintf("'%s' must have nonempty column names.", arg), call. = FALSE)
+  }
+  duplicated_names <- unique(column_names[duplicated(column_names)])
+  if (length(duplicated_names) > 0L) {
+    stop(
+      sprintf("'%s' has duplicated column names: %s.",
+              arg, paste(duplicated_names, collapse = ", ")),
+      call. = FALSE
+    )
+  }
+
+  values <- as.matrix(x)
+  if (any(!is.finite(values))) {
+    bad_columns <- column_names[colSums(!is.finite(values)) > 0L]
+    stop(
+      sprintf(
+        "'%s' contains missing or non-finite values in column%s: %s.",
+        arg,
+        if (length(bad_columns) == 1L) "" else "s",
+        paste(bad_columns, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+
+  constant <- vapply(as.data.frame(x), function(column) {
+    length(unique(column)) < 2L
+  }, logical(1))
+  if (any(constant)) {
+    stop(
+      sprintf(
+        "'%s' contains constant column%s: %s.",
+        arg,
+        if (sum(constant) == 1L) "" else "s",
+        paste(column_names[constant], collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+  invisible(TRUE)
+}
+
+validate_control_names <- function(control, valid, arg) {
+  supplied <- names(control)
+  if (length(control) > 0L &&
+      (is.null(supplied) || anyNA(supplied) || any(!nzchar(supplied)))) {
+    stop(sprintf("'%s' must be a fully named list.", arg), call. = FALSE)
+  }
+  if (anyDuplicated(supplied)) {
+    duplicated_names <- unique(supplied[duplicated(supplied)])
+    stop(sprintf("'%s' has duplicated entries: %s.",
+                 arg, paste(duplicated_names, collapse = ", ")),
+         call. = FALSE)
+  }
+  unknown <- setdiff(supplied, valid)
+  if (length(unknown) > 0L) {
+    suggestions <- vapply(unknown, function(entry) {
+      distance <- utils::adist(entry, valid)
+      closest <- valid[which.min(distance)]
+      if (min(distance) <= max(2L, floor(nchar(entry) / 3L))) {
+        sprintf(" Did you mean '%s'?", closest)
+      } else {
+        ""
+      }
+    }, character(1))
+    stop(
+      paste0(
+        "Unknown entry in '", arg, "': '", unknown[[1L]], "'.",
+        suggestions[[1L]]
+      ),
+      call. = FALSE
+    )
   }
   invisible(TRUE)
 }
