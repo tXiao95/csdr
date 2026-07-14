@@ -44,6 +44,38 @@ Z_hat <- scores(fit, variant = "DR")
 target_data <- targets(fit, variant = "DR")
 ```
 
+Inspect the original MAVE fit and, when dimension selection was run, its raw
+selection object:
+
+```r
+mave <- mave_fits(fit, variant = "DR")
+mave$fit
+mave$dimension_selection
+```
+
+MAVE objects are retained by default. Nuisance fits can be substantially larger
+and are retained only when requested:
+
+```r
+fit_with_nuisance <- csdr(
+  Y = csdr_example$Y,
+  A = csdr_example$A,
+  C = csdr_example$C,
+  d = 1,
+  L = 2,
+  learners = csdr_learners(sl_library = "SL.glm"),
+  keep_nuisance = TRUE,
+  verbose = FALSE
+)
+
+outcome_folds <- nuisance_fits(fit_with_nuisance, role = "outcome")
+gps_fold_1 <- nuisance_fits(fit_with_nuisance, role = "gps", fold = 1)
+```
+
+Set `keep_mave = FALSE`, `keep_targets = FALSE`, or leave
+`keep_nuisance = FALSE` to reduce the size of saved fit objects when those raw
+components are not needed.
+
 The quick start uses `SL.glm`, which is included with SuperLearner and keeps the
 example lightweight. The default SuperLearner library can also use `glmnet`,
 `xgboost`, and `earth` when those optional packages are installed.
