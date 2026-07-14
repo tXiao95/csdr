@@ -1,6 +1,12 @@
 condition_test_data <- function() {
-  load(testthat::test_path("..", "..", "data", "csdr_example.rda"))
-  csdr_example
+  data_path <- testthat::test_path("..", "..", "data", "csdr_example.rda")
+  data_environment <- new.env(parent = emptyenv())
+  if (file.exists(data_path)) {
+    load(data_path, envir = data_environment)
+  } else {
+    utils::data("csdr_example", package = "csdr", envir = data_environment)
+  }
+  data_environment$csdr_example
 }
 
 test_that("validation errors expose a structured parent condition", {
