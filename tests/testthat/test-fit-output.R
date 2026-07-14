@@ -1,6 +1,14 @@
 fit_output_data <- function() {
-  load(testthat::test_path("..", "..", "data", "csdr_example.rda"))
-  csdr_example
+  data_path <- testthat::test_path("..", "..", "data", "csdr_example.rda")
+  if (file.exists(data_path)) {
+    data_environment <- new.env(parent = emptyenv())
+    load(data_path, envir = data_environment)
+    data_environment$csdr_example
+  } else {
+    data_environment <- new.env(parent = emptyenv())
+    utils::data("csdr_example", package = "csdr", envir = data_environment)
+    data_environment$csdr_example
+  }
 }
 
 test_that("csdr preserves names on coefficients and scores", {

@@ -1,5 +1,10 @@
 test_that("bundled example supports the documented quick start", {
-  load(testthat::test_path("..", "..", "data", "csdr_example.rda"))
+  data_path <- testthat::test_path("..", "..", "data", "csdr_example.rda")
+  if (file.exists(data_path)) {
+    load(data_path)
+  } else {
+    utils::data("csdr_example", package = "csdr", envir = environment())
+  }
 
   expect_named(csdr_example, c("Y", "A", "C"))
   expect_length(csdr_example$Y, 60L)
