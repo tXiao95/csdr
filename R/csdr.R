@@ -20,6 +20,12 @@
 #' intensive because of its marginalization step. See [csdr_target()] for the
 #' lower-level target-construction interface.
 #'
+#' Validation failures have class `"csdr_validation_error"`. Failures during
+#' nuisance fitting, target construction, MAVE fitting, or dimension selection
+#' have class `"csdr_fit_error"` and retain the original condition in `parent`.
+#' Structured fields identify the `stage` and, when available, the `variant`,
+#' `fold`, and learner `role`.
+#'
 #' @param Y Numeric outcome vector of length `n`.
 #' @param A Numeric matrix or data frame of observed continuous exposures.
 #' @param C Numeric matrix or data frame of observed covariates.
@@ -115,22 +121,34 @@ csdr <- function(
   valid_variants <- c("RA", "DR", "PO", "RP")
   variants <- match.arg(variants, choices = valid_variants, several.ok = TRUE)
 
-  validate_csdr_options(
-    Y = Y,
-    A = A,
-    C = C,
-    d = d,
-    max_dim = max_dim,
-    L = L,
-    learners = learners,
-    target_control = target_control,
-    mave_control = mave_control,
-    keep_targets = keep_targets,
-    keep_mave = keep_mave,
-    keep_nuisance = keep_nuisance,
-    verbose = verbose
+  tryCatch(
+    {
+      validate_csdr_options(
+        Y = Y,
+        A = A,
+        C = C,
+        d = d,
+        max_dim = max_dim,
+        L = L,
+        learners = learners,
+        target_control = target_control,
+        mave_control = mave_control,
+        keep_targets = keep_targets,
+        keep_mave = keep_mave,
+        keep_nuisance = keep_nuisance,
+        verbose = verbose
+      )
+      validate_csdr_learners(learners)
+    },
+    error = function(e) {
+      csdr_abort(
+        conditionMessage(e),
+        class = "csdr_validation_error",
+        stage = "validation",
+        parent = e
+      )
+    }
   )
-  validate_csdr_learners(learners)
 
   data <- normalize_ers_inputs(Y = Y, A = A, C = C, a_eval = A)
   A_mat <- as.matrix(data$A)
@@ -149,26 +167,35 @@ csdr <- function(
   }
   learner_args <- as_csdr_target_args(learners = learners, target_control = target_control)
 
-  target_obj <- csdr_target(
-    Y = data$Y,
-    A = data$A,
-    C = data$C,
-    methods = variants,
-    L = L,
-    folds = target_control$folds,
-    outcome_fitter = learner_args$outcome_fitter,
-    gps_fitter = learner_args$gps_fitter,
-    rp_y_fitter = learner_args$rp_y_fitter,
-    rp_a_fitter = learner_args$rp_a_fitter,
-    args_outcome = learner_args$args_outcome,
-    args_gps = learner_args$args_gps,
-    args_rp_y = learner_args$args_rp_y,
-    args_rp_a = learner_args$args_rp_a,
-    args_ers = target_control$args_ers %||% list(),
-    po_marginalization = target_control$po_marginalization %||% "crossfit",
-    seed = seed,
-    return_nuisance = keep_nuisance,
-    verbose = verbose
+  target_obj <- tryCatch(
+    csdr_target(
+      Y = data$Y,
+      A = data$A,
+      C = data$C,
+      methods = variants,
+      L = L,
+      folds = target_control$folds,
+      outcome_fitter = learner_args$outcome_fitter,
+      gps_fitter = learner_args$gps_fitter,
+      rp_y_fitter = learner_args$rp_y_fitter,
+      rp_a_fitter = learner_args$rp_a_fitter,
+      args_outcome = learner_args$args_outcome,
+      args_gps = learner_args$args_gps,
+      args_rp_y = learner_args$args_rp_y,
+      args_rp_a = learner_args$args_rp_a,
+      args_ers = target_control$args_ers %||% list(),
+      po_marginalization = target_control$po_marginalization %||% "crossfit",
+      seed = seed,
+      return_nuisance = keep_nuisance,
+      verbose = verbose
+    ),
+    error = function(e) {
+      csdr_rethrow(
+        e,
+        "Target construction failed. Check the nuisance specifications and target controls.",
+        stage = "target_construction"
+      )
+    }
   )
 
   fits <- lapply(variants, function(variant) {
@@ -263,11 +290,33 @@ fit_csdr_variant <- function(variant, target_Y, target_A, d, max_dim,
     list(formula = target_Y ~ ., data = df, method = "meanMAVE"),
     mave_control
   )
-  mave_fit <- do.call(MAVE::mave, mave_args)
+  mave_fit <- tryCatch(
+    do.call(MAVE::mave, mave_args),
+    error = function(e) {
+      csdr_rethrow(
+        e,
+        sprintf("MAVE fitting failed for variant '%s'. Check 'mave_control' and the generated target.",
+                variant),
+        stage = "mave_fit",
+        variant = variant
+      )
+    }
+  )
 
   dim_obj <- NULL
   if (is.null(d)) {
-    dim_obj <- MAVE::mave.dim(mave_fit, max.dim = max_dim_variant)
+    dim_obj <- tryCatch(
+      MAVE::mave.dim(mave_fit, max.dim = max_dim_variant),
+      error = function(e) {
+        csdr_rethrow(
+          e,
+          sprintf("Dimension selection failed for variant '%s'. Consider supplying 'd' explicitly.",
+                  variant),
+          stage = "dimension_selection",
+          variant = variant
+        )
+      }
+    )
     d_hat <- extract_mave_dim(dim_obj)
   } else {
     d_hat <- as.integer(d)

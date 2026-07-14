@@ -144,21 +144,43 @@ csdr_target <- function(
 
     out_mod <- gps_mod <- NULL
     if (needs_outcome) {
-      out_mod <- fit_csdr_target_outcome_nuisance(
-        Y = Y_train,
-        A = A_train,
-        C = C_train,
-        outcome_fitter = outcome_fitter,
-        args_outcome = args_outcome
+      out_mod <- tryCatch(
+        fit_csdr_target_outcome_nuisance(
+          Y = Y_train,
+          A = A_train,
+          C = C_train,
+          outcome_fitter = outcome_fitter,
+          args_outcome = args_outcome
+        ),
+        error = function(e) {
+          csdr_rethrow(
+            e,
+            sprintf("Outcome nuisance fitting failed in fold %d.", k),
+            stage = "nuisance_fit",
+            fold = k,
+            role = "outcome"
+          )
+        }
       )
       nuisance_store$outcome_models[[k]] <- out_mod
     }
     if (needs_gps) {
-      gps_mod <- fit_csdr_target_gps_nuisance(
-        A = A_train,
-        C = C_train,
-        gps_fitter = gps_fitter,
-        args_gps = args_gps
+      gps_mod <- tryCatch(
+        fit_csdr_target_gps_nuisance(
+          A = A_train,
+          C = C_train,
+          gps_fitter = gps_fitter,
+          args_gps = args_gps
+        ),
+        error = function(e) {
+          csdr_rethrow(
+            e,
+            sprintf("GPS nuisance fitting failed in fold %d.", k),
+            stage = "nuisance_fit",
+            fold = k,
+            role = "gps"
+          )
+        }
       )
       nuisance_store$gps_models[[k]] <- gps_mod
     }
@@ -226,15 +248,26 @@ csdr_target <- function(
       }
     }
     if (needs_rp) {
-      rp_mod <- fit_rp_nuisance(
-        Y = Y_train,
-        A = A_train,
-        C = C_train,
-        y_fitter = rp_y_fitter,
-        a_fitter = rp_a_fitter,
-        args_y = args_rp_y,
-        args_a = args_rp_a,
-        verbose = FALSE
+      rp_mod <- tryCatch(
+        fit_rp_nuisance(
+          Y = Y_train,
+          A = A_train,
+          C = C_train,
+          y_fitter = rp_y_fitter,
+          a_fitter = rp_a_fitter,
+          args_y = args_rp_y,
+          args_a = args_rp_a,
+          verbose = FALSE
+        ),
+        error = function(e) {
+          csdr_rethrow(
+            e,
+            sprintf("Residualized-pair nuisance fitting failed in fold %d.", k),
+            stage = "nuisance_fit",
+            fold = k,
+            role = "rp"
+          )
+        }
       )
       nuisance_store$rp_models[[k]] <- rp_mod
       rp_pred <- predict_rp_nuisance(nuisance = rp_mod, C = C_test)
@@ -353,9 +386,9 @@ prepare_modular_ers_args <- function(args_ers) {
   out$po_marginalization <- NULL
   out$marginalization <- NULL
   if (isTRUE(out$optimize_bw)) {
-    warning(
+    csdr_warn(
       "'optimize_bw' is not implemented in modular ERS target construction and is ignored.",
-      call. = FALSE
+      stage = "target_construction"
     )
   }
   out$optimize_bw <- NULL
