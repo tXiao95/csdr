@@ -16,4 +16,4 @@ rownames(A) <- observation_names
 rownames(C) <- observation_names
 
 csdr_example <- list(Y = Y, A = A, C = C)
-save(csdr_example, file = "data/csdr_example.rda", compress = "xz")
+save(csdr_example, file = "data/csdr_example.rda", compress = "xz", version = 2L)
