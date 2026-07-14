@@ -74,6 +74,22 @@ sufficient dimension reduction basis. It first constructs generated
 response/exposure targets with \code{\link[=csdr_target]{csdr_target()}}, then fits MAVE separately for
 each requested target variant.
 }
+\details{
+The available target variants are:
+\itemize{
+\item \code{"RA"}: regression-adjustment target using an outcome regression.
+\item \code{"DR"}: doubly robust target using an outcome regression and generalized
+propensity score (GPS).
+\item \code{"PO"}: pseudo-outcome target using both nuisance components and an
+additional marginalization step.
+\item \code{"RP"}: residualized-pair target using regressions of the outcome and each
+exposure on the covariates.
+}
+
+\code{"DR"} is the default. \code{"PO"} is generally the most computationally
+intensive because of its marginalization step. See \code{\link[=csdr_target]{csdr_target()}} for the
+lower-level target-construction interface.
+}
 \examples{
 \dontrun{
 fit <- csdr(Y, A, C)

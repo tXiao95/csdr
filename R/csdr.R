@@ -5,6 +5,21 @@
 #' response/exposure targets with [csdr_target()], then fits MAVE separately for
 #' each requested target variant.
 #'
+#' @details
+#' The available target variants are:
+#'
+#' - `"RA"`: regression-adjustment target using an outcome regression.
+#' - `"DR"`: doubly robust target using an outcome regression and generalized
+#'   propensity score (GPS).
+#' - `"PO"`: pseudo-outcome target using both nuisance components and an
+#'   additional marginalization step.
+#' - `"RP"`: residualized-pair target using regressions of the outcome and each
+#'   exposure on the covariates.
+#'
+#' `"DR"` is the default. `"PO"` is generally the most computationally
+#' intensive because of its marginalization step. See [csdr_target()] for the
+#' lower-level target-construction interface.
+#'
 #' @param Y Numeric outcome vector of length `n`.
 #' @param A Numeric matrix or data frame of observed continuous exposures.
 #' @param C Numeric matrix or data frame of observed covariates.
