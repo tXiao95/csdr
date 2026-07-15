@@ -80,6 +80,14 @@
 #'   )
 #' )
 #'
+#' fit_binary <- csdr(
+#'   Y, A, C,
+#'   learners = csdr_learners(
+#'     outcome_family = "binomial",
+#'     sl_library = "SL.glm"
+#'   )
+#' )
+#'
 #' my_fitter <- function(Y, W, ...) {
 #'   fit <- stats::lm(Y ~ ., data = data.frame(Y = Y, W))
 #'   structure(list(fit = fit), class = "my_regression")
@@ -477,8 +485,9 @@ summarize_csdr_learners <- function(learners, variants) {
 
 describe_csdr_learner <- function(learner) {
   if (identical(learner$engine, "SuperLearner")) {
-    return(paste(
-      "SL.library:",
+    return(sprintf(
+      "family: %s; SL.library: %s",
+      learner$summary$family,
       paste(learner$summary$SL.library, collapse = ", ")
     ))
   }
