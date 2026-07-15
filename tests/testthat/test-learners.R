@@ -55,6 +55,63 @@ test_that("csdr_learners returns and validates default learner roles", {
   expect_equal(glm_only$gps$args$method_gps, "linear")
 })
 
+test_that("outcome_family configures only default outcome-response learners", {
+  gaussian <- csdr_learners(sl_library = "SL.glm")
+  binomial <- csdr_learners(
+    sl_library = "SL.glm",
+    outcome_family = "binomial"
+  )
+
+  expect_identical(gaussian$outcome$args$family$family, "gaussian")
+  expect_identical(gaussian$rp_y$args$family$family, "gaussian")
+  expect_identical(gaussian$rp_a$args$family$family, "gaussian")
+
+  expect_identical(binomial$outcome$args$family$family, "binomial")
+  expect_identical(binomial$rp_y$args$family$family, "binomial")
+  expect_identical(binomial$rp_a$args$family$family, "gaussian")
+  expect_error(csdr_learners(outcome_family = "poisson"), "should be one of")
+})
+
+test_that("explicit learner roles override outcome_family with one warning", {
+  custom <- custom_regression(function(...) NULL, label = "custom")
+
+  expect_warning(
+    one_override <- csdr_learners(
+      outcome = custom,
+      outcome_family = "binomial",
+      sl_library = "SL.glm"
+    ),
+    "ignored.*role: outcome"
+  )
+  expect_identical(one_override$outcome, custom)
+  expect_identical(one_override$rp_y$args$family$family, "binomial")
+
+  expect_warning(
+    both_overrides <- csdr_learners(
+      outcome = custom,
+      rp_y = custom,
+      outcome_family = "gaussian",
+      sl_library = "SL.glm"
+    ),
+    "ignored.*roles: outcome, rp_y"
+  )
+  expect_identical(both_overrides$outcome, custom)
+  expect_identical(both_overrides$rp_y, custom)
+
+  expect_silent(csdr_learners(outcome = custom, sl_library = "SL.glm"))
+})
+
+test_that("learner reporting includes the SuperLearner family", {
+  learners <- csdr_learners(
+    outcome_family = "binomial",
+    sl_library = "SL.glm"
+  )
+  printed <- capture.output(print(learners))
+  expect_true(any(grepl("outcome:.*family: binomial", printed)))
+  expect_true(any(grepl("rp_y:.*family: binomial", printed)))
+  expect_true(any(grepl("rp_a:.*family: gaussian", printed)))
+})
+
 test_that("low-level and compatibility fitters still fit toy data", {
   d <- learner_toy_data()
   W <- cbind(d$A, d$C)

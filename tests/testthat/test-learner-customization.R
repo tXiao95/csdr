@@ -90,3 +90,36 @@ test_that("custom GPS learner validates and runs through csdr", {
   expect_equal(fit$learner_summary$label[fit$learner_summary$role == "gps"], "custom mvn gps")
   expect_true(is.matrix(coef(fit, variant = "DR")))
 })
+
+test_that("binomial SuperLearner nuisances run through RA and RP", {
+  d <- learner_custom_data(seed = 8104, n = 60)
+  probability <- stats::plogis(
+    -0.2 + 0.8 * d$A[, 1L] - 0.3 * d$A[, 2L] + 0.4 * d$C[, 1L]
+  )
+  set.seed(8105)
+  binary_y <- stats::rbinom(length(probability), size = 1L, prob = probability)
+
+  fit <- suppressWarnings(csdr(
+    Y = binary_y,
+    A = d$A,
+    C = d$C,
+    variants = c("RA", "RP"),
+    d = 1,
+    L = 2,
+    learners = csdr_learners(
+      outcome_family = "binomial",
+      sl_library = "SL.glm"
+    ),
+    verbose = FALSE
+  ))
+
+  expect_s3_class(fit, "csdr_fit")
+  expect_named(fit$fits, c("RA", "RP"))
+  expect_identical(fit$learners$outcome$args$family$family, "binomial")
+  expect_identical(fit$learners$rp_y$args$family$family, "binomial")
+  expect_identical(fit$learners$rp_a$args$family$family, "gaussian")
+  expect_match(
+    fit$learner_summary$details[fit$learner_summary$role == "outcome"],
+    "family: binomial"
+  )
+})
