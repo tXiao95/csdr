@@ -9,7 +9,8 @@ csdr_learners(
   gps = NULL,
   rp_y = NULL,
   rp_a = NULL,
-  sl_library = NULL
+  sl_library = NULL,
+  outcome_family = c("gaussian", "binomial")
 )
 }
 \arguments{
@@ -23,6 +24,13 @@ csdr_learners(
 
 \item{sl_library}{Optional SuperLearner library used by unspecified
 SuperLearner regression learners.}
+
+\item{outcome_family}{Outcome family used by the default SuperLearner
+specifications for \code{outcome} and \code{rp_y}. One of \code{"gaussian"} or
+\code{"binomial"}. Gaussian is the default and is used for continuous and count
+outcomes; binomial is intended for binary outcomes. Explicit \code{outcome} or
+\code{rp_y} specifications take precedence with a warning. This argument does
+not configure custom learners.}
 }
 \value{
 A list of CSDR learner specifications with class \code{"csdr_learners"}.
