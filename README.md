@@ -3,6 +3,31 @@
 `csdr` estimates causal sufficient dimension reduction targets for continuous
 multivariate exposures. The main user-facing entry point is `csdr()`.
 
+## Methodology and Citation
+
+The methods implemented in `csdr` are introduced in:
+
+> Hsiao, T. W., Chang, H. H., and Nabi, R. (2026). *Causal Sufficient
+> Dimension Reduction for Multiple Continuous Exposures with an Application to
+> Environmental Mixtures*. arXiv:2606.14840.
+> https://doi.org/10.48550/arXiv.2606.14840
+
+If you use `csdr` in your work, please cite this preprint:
+
+```bibtex
+@misc{hsiao2026causal,
+  title = {Causal Sufficient Dimension Reduction for Multiple Continuous
+           Exposures with an Application to Environmental Mixtures},
+  author = {Hsiao, Thomas W. and Chang, Howard H. and Nabi, Razieh},
+  year = {2026},
+  eprint = {2606.14840},
+  archivePrefix = {arXiv},
+  primaryClass = {stat.ME},
+  doi = {10.48550/arXiv.2606.14840},
+  url = {https://arxiv.org/abs/2606.14840}
+}
+```
+
 ## Installation
 
 ```r
