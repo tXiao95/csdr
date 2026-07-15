@@ -149,6 +149,33 @@ Default nuisance learners:
 If optional learner packages are not installed, the SuperLearner fitting engine
 uses the available requested wrappers.
 
+## Outcome Families
+
+Gaussian is the default outcome family and is used for continuous and count
+outcomes. For a binary outcome, configure the package-provided SuperLearner
+nuisance regressions with `outcome_family = "binomial"`:
+
+```r
+binary_learners <- csdr_learners(
+  outcome_family = "binomial",
+  sl_library = "SL.glm"
+)
+
+binary_fit <- csdr(
+  Y = binary_Y,
+  A = A,
+  C = C,
+  learners = binary_learners
+)
+```
+
+The selected family applies to `E[Y | A, C]` for RA, DR, and PO and to
+`E[Y | C]` for RP. Regressions of `A` on `C` remain Gaussian, and the GPS is
+unchanged. Explicit `outcome` or `rp_y` learner specifications override this
+shortcut with a warning. Custom learners remain responsible for their own
+response-family behavior. Poisson-specific nuisance modeling and automatic
+family inference are not currently provided.
+
 ## Modify the SuperLearner Library
 
 Use one SuperLearner library for all default regression learner roles:
