@@ -135,6 +135,12 @@ custom_gps <- function(fitter, args = list(), label = NULL) {
 #' @param rp_a Learner for `E[A_j | C]` in residualized-pair targets.
 #' @param sl_library Optional SuperLearner library used by unspecified
 #'   SuperLearner regression learners.
+#' @param outcome_family Outcome family used by the default SuperLearner
+#'   specifications for `outcome` and `rp_y`. One of `"gaussian"` or
+#'   `"binomial"`. Gaussian is the default and is used for continuous and count
+#'   outcomes; binomial is intended for binary outcomes. Explicit `outcome` or
+#'   `rp_y` specifications take precedence with a warning. This argument does
+#'   not configure custom learners.
 #'
 #' @return A list of CSDR learner specifications with class `"csdr_learners"`.
 #'
@@ -143,20 +149,53 @@ csdr_learners <- function(outcome = NULL,
                           gps = NULL,
                           rp_y = NULL,
                           rp_a = NULL,
-                          sl_library = NULL) {
+                          sl_library = NULL,
+                          outcome_family = c("gaussian", "binomial")) {
+  family_supplied <- !missing(outcome_family)
+  explicit_roles <- c(
+    if (!is.null(outcome)) "outcome",
+    if (!is.null(rp_y)) "rp_y"
+  )
+  outcome_family <- match.arg(outcome_family)
+  family_object <- switch(
+    outcome_family,
+    gaussian = stats::gaussian(),
+    binomial = stats::binomial()
+  )
+
+  if (family_supplied && length(explicit_roles) > 0L) {
+    csdr_warn(
+      sprintf(
+        "'outcome_family' was ignored for explicitly supplied learner role%s: %s.",
+        if (length(explicit_roles) == 1L) "" else "s",
+        paste(explicit_roles, collapse = ", ")
+      ),
+      stage = "learner_configuration"
+    )
+  }
+
   default_sl <- sl_library %||% csdr_default_sl_library()
 
   if (is.null(outcome)) {
-    outcome <- mark_default_learner(sl_regression(SL.library = default_sl))
+    outcome <- mark_default_learner(sl_regression(
+      SL.library = default_sl,
+      family = family_object
+    ))
   }
   if (is.null(gps)) {
     gps <- mark_default_learner(mvn_gps(method = "linear"))
   }
   if (is.null(rp_y)) {
-    rp_y <- mark_default_learner(sl_regression(SL.library = default_sl))
+    rp_y <- mark_default_learner(sl_regression(
+      SL.library = default_sl,
+      family = family_object
+    ))
   }
   if (is.null(rp_a)) {
-    rp_a <- mark_default_learner(sl_regression(SL.library = default_sl))
+    rp_a <- mark_default_learner(sl_regression(
+      SL.library = default_sl,
+      family = stats::gaussian()
+    ))
   }
 
   out <- list(outcome = outcome, gps = gps, rp_y = rp_y, rp_a = rp_a)
@@ -188,6 +227,9 @@ print.csdr_learners <- function(x, ...) {
     cat(sprintf("- %s: %s", role, learner$label))
     if (isTRUE(learner$is_default)) {
       cat(" (default)")
+    }
+    if (identical(learner$engine, "SuperLearner")) {
+      cat(sprintf(" [family: %s]", learner$summary$family))
     }
     cat("\n")
   }
