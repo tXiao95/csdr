@@ -85,9 +85,9 @@ example lightweight. The default SuperLearner library can also use `glmnet`,
 | Variant | Nuisance models | Main modeling reliance | Relative cost |
 |---|---|---|---|
 | `RA` | Outcome regression | Correct outcome regression | Low |
-| `DR` | Outcome regression and GPS | Either nuisance component provides robustness under the method's assumptions | Medium |
-| `PO` | Outcome regression and GPS | Pseudo-outcome construction and marginalization | High |
-| `RP` | `E[Y \| C]` and each `E[A_j \| C]` | Residualization models | Medium |
+| `DR` | Outcome regression and GPS | One of the outcome regression or GPS is correct | Medium |
+| `PO` | Outcome regression and GPS | Same as DR | Medium |
+| `RP` | `E[Y \| C]` and each `E[A_j \| C]` | Residualization models | High |
 
 `DR` is the package default and a reasonable starting point when both the
 outcome regression and generalized propensity score can be estimated. Use the
