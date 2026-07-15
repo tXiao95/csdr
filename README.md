@@ -3,7 +3,7 @@
 `csdr` estimates causal sufficient dimension reduction targets for continuous
 multivariate exposures. The main user-facing entry point is `csdr()`.
 
-## Methodology and Citation
+## Citation
 
 The methods implemented in `csdr` are introduced in:
 
